@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOC Analyzer & JFLAP Studio — Teoría de la Computación (USIL)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        function loadSample(type) {
+            const samples = {
+                'valido': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}\n2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"root","ctx":{"port":22}}',
+                'lexico': '2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}',
+                'sintactico': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3',
+                'semantico': '2026-09-20T14:32:05 999.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}'
+            };
+            document.getElementById('log_input').value = samples[type];
+        }
+
+        function switchMainTab(tabId) {
+            document.querySelectorAll('.main-tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.main-tab-btn').forEach(el => {
+                el.classList.remove('border-emerald-500', 'text-emerald-400', 'bg-slate-800/90');
+                el.classList.add('border-transparent', 'text-slate-400');
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.add('border-emerald-500', 'text-emerald-400', 'bg-slate-800/90');
+            activeBtn.classList.remove('border-transparent', 'text-slate-400');
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+
+    <!-- ENCABEZADO PRINCIPAL -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                <div>
+                    <h1 class="text-lg font-bold text-white">Analizador Léxico, Sintáctico y Semántico SOC — JFLAP & Tree Visualizer</h1>
+                    <p class="text-xs text-slate-400">Teoría de la Computación • USIL 2026 • Estudiante: Fernando Spray Solis</p>
+                </div>
+            </div>
+            <div class="flex gap-2 text-xs">
+                <span class="px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600 text-amber-200 font-semibold">Gráficos JFLAP 7.1 (AFD / AFND)</span>
+                <span class="px-3 py-1 rounded-full bg-sky-950/80 border border-sky-600 text-sky-200 font-semibold">Árboles Jerárquicos (Raíz → Ramas → Hojas)</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+        <!-- CONSOLA DE ENTRADA Y SUBIDA DE ARCHIVO TXT -->
+        <section class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+            <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                <div>
+                    <h2 class="text-base font-semibold text-white">1. Entrada de Logs de Seguridad del SOC (Texto o Archivo .txt)</h2>
+                    <p class="text-xs text-slate-400">Estructura del lenguaje formal: <code class="text-emerald-400">TIMESTAMP IP SEVERITY EVENT_TYPE PAYLOAD</code></p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="loadSample('valido')" class="text-xs px-3 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 transition">Ejemplo Válido + Anidado</button>
+                    <button type="button" onclick="loadSample('lexico')" class="text-xs px-3 py-1.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700 transition">Error Léxico (@)</button>
+                    <button type="button" onclick="loadSample('sintactico')" class="text-xs px-3 py-1.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 transition">Error Sintáctico (Falta })</button>
+                    <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Error Semántico (IP 999)</button>
+                </div>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                <textarea id="log_input" name="log_input" rows="3"
+                    class="w-full bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-sm text-emerald-300 focus:outline-none focus:border-emerald-500"
+                    placeholder="Pega tus logs aquí...">{{ log_input }}</textarea>
+
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <label class="text-xs text-slate-300 font-medium">Subir archivo <code class="text-emerald-400">.txt</code>:</label>
+                        <input type="file" name="txt_file" accept=".txt,.log"
+                            class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700"/>
+                    </div>
+                    <button type="submit"
+                        class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg transition">
+                        Analizar y Generar Gráficos JFLAP + Árboles Reales
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- TARJETAS DE RESUMEN -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p class="text-xs text-slate-400">Logs Analizados</p>
+                <p class="text-2xl font-bold text-white mt-1">{{ summary.total_lines }}</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p class="text-xs text-slate-400">Total Tokens Extraídos</p>
+                <p class="text-2xl font-bold text-sky-400 mt-1">{{ summary.total_tokens }}</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p class="text-xs text-slate-400">Logs Válidos (Accept)</p>
+                <p class="text-2xl font-bold text-emerald-400 mt-1">{{ summary.accepted }}</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p class="text-xs text-slate-400">Logs con Error (Reject)</p>
+                <p class="text-2xl font-bold text-rose-400 mt-1">{{ summary.rejected }}</p>
+            </div>
+        </section>
+
+        <!-- BARRA DE PESTAÑAS -->
+        <div class="border-b border-slate-800 flex flex-wrap gap-2">
+            <button id="btn-tab-tokens" onclick="switchMainTab('tab-tokens')"
+                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-emerald-500 text-emerald-400 bg-slate-800/90 rounded-t-lg transition">
+                1. Tokens, Lexemas, Autómatas JFLAP y Árboles por cada Token
+            </button>
+            <button id="btn-tab-arboles-gen" onclick="switchMainTab('tab-arboles-gen')"
+                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
+                2. Árboles Sintácticos y Semánticos Generales (Raíz y Ramas)
+            </button>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- PESTAÑA 1: TOKENS, LEXEMAS, JFLAP Y ÁRBOLES POR CADA TOKEN         -->
+        <!-- ================================================================== -->
+        <div id="tab-tokens" class="main-tab-content space-y-8">
+            {% for res in results %}
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+                <div class="flex flex-wrap justify-between items-center gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <span class="text-xs font-mono uppercase text-slate-400">Log Línea #{{ res.line_number }}</span>
+                        <p class="font-mono text-sm text-slate-100 mt-1 break-all">{{ res.raw }}</p>
+                    </div>
+                    {% if res.status == 'VÁLIDO (ACEPTADO)' %}
+                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-700">✅ {{ res.status }}</span>
+                    {% else %}
+                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-400 border border-rose-700">❌ {{ res.status }}</span>
+                    {% endif %}
+                </div>
+
+                {% if res.errors %}
+                <div class="bg-rose-950/60 border border-rose-800 rounded-lg p-4 text-xs text-rose-200 space-y-1">
+                    <p class="font-bold text-rose-400">Reporte de Error Detectado:</p>
+                    {% for err in res.errors %}
+                        <p>• {{ err }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- TABLA DE TOKENS Y LEXEMAS -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-800 text-slate-200 uppercase">
+                                <th class="p-3 border border-slate-700">#</th>
+                                <th class="p-3 border border-slate-700">Token (Agrupador)</th>
+                                <th class="p-3 border border-slate-700">Lexema Reconocido</th>
+                                <th class="p-3 border border-slate-700">Categoría Léxica</th>
+                                <th class="p-3 border border-slate-700">Expresión Regular</th>
+                                <th class="p-3 border border-slate-700">Estado Semántico</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800">
+                            {% for tok in res.tokens %}
+                            <tr class="hover:bg-slate-800/40">
+                                <td class="p-3 border border-slate-800 font-mono text-slate-400">{{ tok.index }}</td>
+                                <td class="p-3 border border-slate-800 font-bold text-emerald-400 font-mono">{{ tok.type }}</td>
+                                <td class="p-3 border border-slate-800 font-mono text-amber-300">{{ tok.value }}</td>
+                                <td class="p-3 border border-slate-800 text-slate-300">{{ tok.categoria }}</td>
+                                <td class="p-3 border border-slate-800 font-mono text-sky-300">{{ tok.regex }}</td>
+                                <td class="p-3 border border-slate-800">
+                                    {% if tok.sem_ok %}
+                                        <span class="text-emerald-400 font-semibold">✔ {{ tok.sem_msg }}</span>
+                                    {% else %}
+                                        <span class="text-rose-400 font-semibold">✖ {{ tok.sem_msg }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- INSPECTOR JFLAP Y ÁRBOLES POR CADA TOKEN -->
+                <div class="space-y-4 pt-2">
+                    <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider">
+                        Gráficos JFLAP (AFD y AFND) y Árboles (Sintáctico y Semántico) de cada Token Reconocido
+                    </h3>
+                    <p class="text-xs text-slate-400">Despliega cualquier token para ver su ventana JFLAP 7.1 (triángulo inicial, estados amarillos, doble círculo final y tabla Multiple Run) y sus árboles reales con raíz y ramas:</p>
+
+                    {% for tok in res.tokens %}
+                    <details class="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden group" {% if loop.first %}open{% endif %}>
+                        <summary class="px-4 py-3 cursor-pointer flex flex-wrap justify-between items-center bg-slate-900 hover:bg-slate-800/80 transition">
+                            <div class="flex items-center gap-3">
+                                <span class="px-2.5 py-0.5 rounded bg-amber-950 border border-amber-600 text-amber-300 font-mono text-xs font-bold">Token #{{ tok.index }}: {{ tok.type }}</span>
+                                <span class="font-mono text-sm text-white font-bold">{{ tok.value }}</span>
+                                <span class="text-xs text-slate-400">({{ tok.categoria }})</span>
+                            </div>
+                            <span class="text-xs text-emerald-400 font-semibold">▼ Ver Diagramas JFLAP y Árboles del Token</span>
+                        </summary>
+
+                        <div class="p-5 space-y-6 border-t border-slate-800">
+
+                            <!-- VENTANAS JFLAP: AFD Y AFND LADO A LADO -->
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- VENTANA JFLAP AFD -->
+                                <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
+                                    <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
+                                        <span>☕ JFLAP 7.1 — AFD (Determinista) para {{ tok.type }}</span>
+                                        <span class="font-mono text-[11px] bg-amber-200 px-2 py-0.5 rounded border border-amber-500">{{ tok.quintupla_afd.delta }}</span>
+                                    </div>
+                                    <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
+                                        S = {{ tok.quintupla_afd.Q }} | Σ = {{ tok.quintupla_afd.Sigma }} | S0 = {{ tok.quintupla_afd.q0 }} | F = {{ tok.quintupla_afd.F }}
+                                    </div>
+                                    {{ tok.jflap_afd_svg | safe }}
+                                </div>
+
+                                <!-- VENTANA JFLAP AFND -->
+                                <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
+                                    <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
+                                        <span>☕ JFLAP 7.1 — AFN (No Determinista) para {{ tok.type }}</span>
+                                        <span class="font-mono text-[11px] bg-sky-200 px-2 py-0.5 rounded border border-sky-500">{{ tok.quintupla_afnd.delta }}</span>
+                                    </div>
+                                    <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
+                                        S' = {{ tok.quintupla_afnd.Q }} | Σ = {{ tok.quintupla_afnd.Sigma }} | S0 = {{ tok.quintupla_afnd.q0 }} | F' = {{ tok.quintupla_afnd.F }}
+                                    </div>
+                                    {{ tok.jflap_afnd_svg | safe }}
+                                </div>
+                            </div>
+
+                            <!-- SIMULACIÓN MULTIPLE RUN DE JFLAP -->
+                            <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                                <h4 class="text-xs font-bold text-amber-300 uppercase mb-2">Simulación JFLAP: Input → Multiple Run ({{ tok.type }})</h4>
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-800 text-slate-300">
+                                            <th class="p-2 border border-slate-700">Input (Cadena Evaluada)</th>
+                                            <th class="p-2 border border-slate-700">Result (JFLAP)</th>
+                                            <th class="p-2 border border-slate-700">Justificación Formal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for inp, res_run, mot in tok.jflap_runs %}
+                                        <tr>
+                                            <td class="p-2 border border-slate-800 font-mono text-white">{{ inp }}</td>
+                                            <td class="p-2 border border-slate-800 font-bold {% if res_run == 'Accept' %}text-emerald-400 bg-emerald-950/40{% else %}text-rose-400 bg-rose-950/40{% endif %}">{{ res_run }}</td>
+                                            <td class="p-2 border border-slate-800 text-slate-300">{{ mot }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- ÁRBOL SINTÁCTICO Y SEMÁNTICO REAL DEL TOKEN -->
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div class="bg-slate-900 p-4 rounded-lg border border-slate-800 space-y-2">
+                                    <h4 class="text-xs font-bold text-sky-400 uppercase">Árbol Sintáctico del Token (Raíz, Ramas y Hojas)</h4>
+                                    {{ tok.syn_tree_svg | safe }}
+                                    <p class="text-[11px] font-mono text-slate-400 pt-1">
+                                        <strong class="text-slate-200">Paréntesis anidados:</strong> {{ tok.paren_rep }}
+                                    </p>
+                                </div>
+                                <div class="bg-slate-900 p-4 rounded-lg border border-slate-800 space-y-2">
+                                    <h4 class="text-xs font-bold text-purple-400 uppercase">Árbol Semántico del Token (Atributos y Dominio)</h4>
+                                    {{ tok.sem_tree_svg | safe }}
+                                </div>
+                            </div>
+
+                        </div>
+                    </details>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- PESTAÑA 2: ÁRBOLES SINTÁCTICOS Y SEMÁNTICOS GENERALES              -->
+        <!-- ================================================================== -->
+        <div id="tab-arboles-gen" class="main-tab-content hidden space-y-8">
+            {% for res in results %}
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-white">Árboles Jerárquicos Generales — Log Línea #{{ res.line_number }}</h3>
+                        <p class="text-xs font-mono text-emerald-400 mt-0.5">{{ res.raw }}</p>
+                    </div>
+                    <span class="text-xs font-mono px-3 py-1 rounded bg-slate-800 text-slate-200">{{ res.status }}</span>
+                </div>
+
+                <!-- TRAZA DEL AUTÓMATA DE PILA (PDA) -->
+                <div class="bg-slate-950 border border-slate-800 rounded-lg p-4">
+                    <h4 class="text-xs font-bold text-amber-400 uppercase mb-2">Traza de Aceptación del Autómata de Pila (PDA) — Balanceo de Llaves en PAYLOAD</h4>
+                    <ul class="text-xs font-mono text-slate-300 space-y-1">
+                        {% for step in res.pda_trace %}
+                        <li>• {{ step }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                {% if res.valid_syntactic %}
+                <div class="space-y-6">
+                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-5 space-y-3">
+                        <h4 class="text-sm font-bold text-sky-400 uppercase">
+                            Árbol Sintáctico General (Grafo Jerárquico: Raíz S = LOG, Ramas/Aristas, Nodos Interiores y Nodos Hoja)
+                        </h4>
+                        {{ res.general_syn_svg | safe }}
+                        <div class="bg-slate-900 p-3 rounded border border-slate-800 text-xs font-mono text-slate-300 break-all">
+                            <strong class="text-amber-300">Representación en Paréntesis Anidados:</strong> {{ res.general_paren }}
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-5 space-y-3">
+                        <h4 class="text-sm font-bold text-purple-400 uppercase">
+                            Árbol Semántico General (AST Decorado con Validación de Tipos, Rangos IP/Fecha y Prioridad SOC)
+                        </h4>
+                        {{ res.general_sem_svg | safe }}
+                    </div>
+                </div>
+                {% else %}
+                <div class="bg-rose-950/50 border border-rose-800 rounded-lg p-4 text-xs text-rose-200">
+                    La cadena presenta un fallo sintáctico/léxico ({{ res.errors[0] }}), por lo que la derivación del árbol general se detiene antes de culminar en las hojas.
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+    </main>
+</body>
+</html>

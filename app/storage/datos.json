@@ -1,0 +1,16 @@
+[
+  {
+    "linea": 1,
+    "log_crudo": "2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {\"user\":\"admin\",\"attempts\":3}",
+    "estado": "VÁLIDO (ACEPTADO)",
+    "total_tokens": 13,
+    "errores": []
+  },
+  {
+    "linea": 2,
+    "log_crudo": "2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {\"user\":\"root\",\"ctx\":{\"port\":22}}",
+    "estado": "VÁLIDO (ACEPTADO)",
+    "total_tokens": 17,
+    "errores": []
+  }
+]
