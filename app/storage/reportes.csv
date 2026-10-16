@@ -1,3 +1,2 @@
 Linea,Estado,Total_Tokens,Log_Crudo
-1,VÁLIDO (ACEPTADO),13,"2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {""user"":""admin"",""attempts"":3}"
-2,VÁLIDO (ACEPTADO),17,"2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {""user"":""root"",""ctx"":{""port"":22}}"
+1,ERROR SINTÁCTICO,1,2026
