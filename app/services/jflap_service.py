@@ -1,7 +1,108 @@
 import math
 from app.utils.helpers import escape_svg_text
 
-def render_jflap_svg(states, transitions, width=820, height=230):
+
+def render_transition_table_html(states, transitions, is_afnd=False):
+    """Genera dinámicamente la Tabla de Transición formal (δ) y lista de transiciones para AFD o AFND."""
+    # Extraer las columnas (símbolos de entrada) en orden de aparición sin duplicados
+    symbols = []
+    for t in transitions:
+        lbl = t['label']
+        if lbl not in symbols:
+            symbols.append(lbl)
+
+    has_trap = any(s.get('trap') for s in states)
+    titulo_tabla = "Tabla de Transición Formal δ — AFND (con conjuntos P(Q))" if is_afnd else "Tabla de Transición Formal δ — AFD"
+
+    html_out = [
+        '<div class="mt-3 rounded-lg border border-slate-300 bg-white shadow-sm overflow-hidden">',
+        '  <div class="bg-slate-800 text-white px-3 py-1.5 text-xs font-bold flex items-center justify-between">',
+        f'    <span>{escape_svg_text(titulo_tabla)}</span>',
+        '    <span class="text-[11px] font-normal text-slate-300">→ Estado Inicial | * Estado Final (F)</span>',
+        '  </div>',
+        '  <div class="overflow-x-auto">',
+        '    <table class="w-full text-xs text-left border-collapse">',
+        '      <thead>',
+        '        <tr class="bg-slate-100 border-b border-slate-300 text-slate-700">',
+        '          <th class="py-1.5 px-2.5 font-bold border-r border-slate-300">Estado (Q)</th>'
+    ]
+
+    for sym in symbols:
+        html_out.append(
+            f'          <th class="py-1.5 px-2.5 font-mono font-bold text-center border-r border-slate-200">{escape_svg_text(sym)}</th>'
+        )
+    html_out.append('        </tr>')
+    html_out.append('      </thead>')
+    html_out.append('      <tbody class="divide-y divide-slate-200">')
+
+    for s in states:
+        sid = s['id']
+        prefix = ""
+        if s.get('initial'):
+            prefix += "→ "
+        if s.get('final'):
+            prefix += "* "
+
+        row_bg = "bg-rose-50/60" if s.get('trap') else ("bg-emerald-50/50" if s.get('final') else "bg-white")
+        note = f" <span class='text-[10px] font-normal text-slate-500'>({escape_svg_text(s['note'])})</span>" if s.get('note') else ""
+
+        html_out.append(f'        <tr class="{row_bg} hover:bg-slate-50">')
+        html_out.append(
+            f'          <td class="py-1.5 px-2.5 font-mono font-bold text-slate-900 border-r border-slate-300 whitespace-nowrap">'
+            f'{escape_svg_text(prefix + sid)}{note}</td>'
+        )
+
+        for sym in symbols:
+            targets = [t['to'] for t in transitions if t['from'] == sid and t['label'] == sym]
+
+            if targets:
+                if is_afnd:
+                    cell_val = "{" + ", ".join(targets) + "}"
+                else:
+                    cell_val = targets[0]
+                cell_style = "text-rose-700 font-bold" if "qT" in targets else "text-blue-700 font-bold"
+            else:
+                if is_afnd:
+                    cell_val = "∅"
+                    cell_style = "text-slate-400"
+                else:
+                    if s.get('trap'):
+                        cell_val = sid
+                        cell_style = "text-rose-700 font-semibold"
+                    elif has_trap:
+                        cell_val = "qT"
+                        cell_style = "text-rose-500"
+                    else:
+                        cell_val = "-"
+                        cell_style = "text-slate-400"
+
+            html_out.append(
+                f'          <td class="py-1.5 px-2.5 font-mono text-center border-r border-slate-200 {cell_style}">'
+                f'{escape_svg_text(cell_val)}</td>'
+            )
+
+        html_out.append('        </tr>')
+
+    html_out.append('      </tbody>')
+    html_out.append('    </table>')
+    html_out.append('  </div>')
+
+    # Listado explícito de funciones de transición δ(q, σ) = p (Etapa 2 - Punto 8)
+    trans_items = [
+        f"δ({escape_svg_text(t['from'])}, {escape_svg_text(t['label'])}) = "
+        f"{'{' + escape_svg_text(t['to']) + '}' if is_afnd else escape_svg_text(t['to'])}"
+        for t in transitions
+    ]
+    html_out.append(
+        '  <div class="bg-slate-50 px-3 py-2 border-t border-slate-200 text-[11px] font-mono text-slate-700">'
+        '    <span class="font-bold text-slate-900">Transiciones δ: </span>' + " &nbsp;|&nbsp; ".join(trans_items) +
+        '  </div>'
+    )
+    html_out.append('</div>')
+    return '\n'.join(html_out)
+
+
+def render_jflap_svg(states, transitions, width=820, height=230, is_afnd=False):
     state_map = {s['id']: s for s in states}
     r = 25
 
@@ -114,6 +215,8 @@ def render_jflap_svg(states, transitions, width=820, height=230):
             )
 
     svg.append('</svg>')
+    # Anexar dinámicamente la Tabla de Transición y Transiciones debajo del gráfico
+    svg.append(render_transition_table_html(states, transitions, is_afnd=is_afnd))
     return '\n'.join(svg)
 
 
@@ -330,7 +433,7 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         ]
 
     return (
-        render_jflap_svg(states_afd, trans_afd, height=235),
-        render_jflap_svg(states_afnd, trans_afnd, height=225),
+        render_jflap_svg(states_afd, trans_afd, height=235, is_afnd=False),
+        render_jflap_svg(states_afnd, trans_afnd, height=225, is_afnd=True),
         runs
     )
