@@ -1,11 +1,34 @@
 [
   {
     "linea": 1,
-    "log_crudo": "2026",
-    "estado": "ERROR SINTÁCTICO",
-    "total_tokens": 1,
+    "log_crudo": "2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {\"user\":\"admin\",\"attempts\":3}",
+    "estado": "VÁLIDO (ACEPTADO)",
+    "total_tokens": 13,
+    "errores": []
+  },
+  {
+    "linea": 2,
+    "log_crudo": "2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {\"user\":\"root\",\"ctx\":{\"port\":22}}",
+    "estado": "VÁLIDO (ACEPTADO)",
+    "total_tokens": 17,
+    "errores": []
+  },
+  {
+    "linea": 3,
+    "log_crudo": "2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {\"user\":\"admin\"}",
+    "estado": "ERROR LÉXICO",
+    "total_tokens": 9,
     "errores": [
-      "Error Sintáctico en token #1: Se esperaba 'TIMESTAMP' pero se encontró 'NUMBER'."
+      "Línea 3, Col 34: Símbolo ilegal '@' ∉ Σ. El AFD transita al Estado Trampa (qT)."
+    ]
+  },
+  {
+    "linea": 4,
+    "log_crudo": "2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {\"user\":\"admin\",\"attempts\":3",
+    "estado": "ERROR SINTÁCTICO",
+    "total_tokens": 12,
+    "errores": [
+      "Error Sintáctico en token #13: Se esperaba 'RBRACE' pero se encontró 'FIN_DE_CADENA'."
     ]
   }
 ]

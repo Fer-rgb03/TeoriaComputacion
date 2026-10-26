@@ -1,0 +1,30 @@
+================================================================================
+         REPORTE OFICIAL DE AUDITORÍA Y REVISIÓN DE LOGS — ÁREA SOC / TI        
+================================================================================
+Fecha de emisión        : 2026-10-26 14:59:35
+Total de logs procesados: 4
+Logs Válidos (Aptos BD) : 2
+Logs Erróneos (Revisión): 2
+--------------------------------------------------------------------------------
+SECCIÓN A: LOGS ERRÓNEOS EN CUARENTENA (PARA REVISIÓN DEL ÁREA ENCARGADA)
+--------------------------------------------------------------------------------
+[LÍNEA 03] ESTADO: RECHAZADO_EN_CUARENTENA
+  ├── Log Crudo   : 2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}
+  ├── Diagnóstico : Línea 3, Col 34: Símbolo ilegal '@' ∉ Σ. El AFD transita al Estado Trampa (qT).
+  └── Acción Área : Revisión obligatoria por el Área de SOC / TI
+
+[LÍNEA 04] ESTADO: RECHAZADO_EN_CUARENTENA
+  ├── Log Crudo   : 2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3
+  ├── Diagnóstico : Error Sintáctico en token #13: Se esperaba 'RBRACE' pero se encontró 'FIN_DE_CADENA'.
+  └── Acción Área : Revisión obligatoria por el Área de SOC / TI
+
+--------------------------------------------------------------------------------
+SECCIÓN B: LOGS VERIFICADOS CON SELLO CRIPTOGRÁFICO (APTOS PARA BASE DE DATOS)
+--------------------------------------------------------------------------------
+[LÍNEA 01] VERIFICADO_OK | SELLO_BD: SHA256-38f81f8da46f61d2...
+  └── Registro Limpio: 2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}
+
+[LÍNEA 02] VERIFICADO_OK | SELLO_BD: SHA256-c60591354236f50a...
+  └── Registro Limpio: 2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"root","ctx":{"port":22}}
+
+================================================================================

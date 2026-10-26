@@ -7,7 +7,10 @@ from app.models.token_model import TokenModel
 from app.patterns.singleton.grammar_singleton import GrammarSingleton
 from app.services.jflap_service import build_jflap_models_for_token
 from app.services.tree_service import build_token_real_trees, render_real_tree_svg, tree_to_parentheses
-
+DEFAULT_SAMPLE_LOGS = """2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}
+2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"root","ctx":{"port":22}}
+2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}
+2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3"""
 grammar = GrammarSingleton()
 
 def analyze_single_log(log_line, line_number=1):
@@ -224,3 +227,149 @@ def save_results_to_storage(results):
         writer.writerow(['Linea', 'Estado', 'Total_Tokens', 'Log_Crudo'])
         for item in export_data:
             writer.writerow([item['linea'], item['estado'], item['total_tokens'], item['log_crudo']])
+import hashlib
+from datetime import datetime
+
+# Patrón formal de defensa contra ataques de corrupción de Base de Datos (SQLi / NoSQLi / XSS)
+DB_INJECTION_PATTERNS = re.compile(
+    r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|TRUNCATE)\b|--|;|\bOR\b\s+['\"\d]+=['\"\d]+|\$ne|\$gt|\$where|<script)",
+    re.IGNORECASE
+)
+
+def verificar_defensa_bd(raw_line):
+    """Método de defensa: detecta intentos de inyección para evitar corrupción en la BD."""
+    match = DB_INJECTION_PATTERNS.search(raw_line)
+    if match:
+        return False, f"ATAQUE BLOQUEADO (Escudo BD): Patrón malicioso detectado '{match.group(0)}'."
+    return True, "OK"
+
+def generar_archivos_retroalimentacion(results, storage_dir="app/storage"):
+    """Genera logs_erroneos.json y reporte_area_revision.txt exigidos por la retroalimentación."""
+    os.makedirs(storage_dir, exist_ok=True)
+    fecha_gen = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    logs_erroneos = []
+    logs_verificados = []
+
+    for r in results:
+        raw_log = r.get('raw', '')
+        # Es válido solo si pasó léxico, sintáctico y semántico
+        is_valid = r.get('valid_lexical', False) and r.get('valid_syntactic', False) and r.get('valid_semantic', False)
+        
+        # Aplicar escudo defensivo de Base de Datos
+        seguro_bd, alerta_bd = verificar_defensa_bd(raw_log)
+        if not seguro_bd:
+            is_valid = False
+            r['status'] = 'ATAQUE BLOQUEADO / ERROR'
+            r.setdefault('errors', []).append(alerta_bd)
+
+        if not is_valid:
+            logs_erroneos.append({
+                "linea": r.get('line_number'),
+                "log_original": raw_log,
+                "estado": "RECHAZADO_EN_CUARENTENA",
+                "diagnostico": "; ".join(r.get('errors', ['Estructura inválida'])) if r.get('errors') else alerta_bd,
+                "accion": "Revisión obligatoria por el Área de SOC / TI"
+            })
+        else:
+            sello = hashlib.sha256(f"{raw_log.strip()}|USIL_SOC_2026".encode('utf-8')).hexdigest()[:16]
+            r['db_seal'] = sello
+            logs_verificados.append({
+                "linea": r.get('line_number'),
+                "log_original": raw_log,
+                "sello_bd": f"SHA256-{sello}"
+            })
+
+    # 1. Guardar JSON exclusivo de erróneos
+    ruta_json = os.path.join(storage_dir, "logs_erroneos.json")
+    with open(ruta_json, "w", encoding="utf-8") as fj:
+        json.dump({
+            "metadata": {
+                "proyecto": "Analizador Léxico-Sintáctico SOC con Escudo Anti-Inyección",
+                "fecha_generacion": fecha_gen,
+                "total_procesados": len(results),
+                "total_erroneos": len(logs_erroneos)
+            },
+            "logs_erroneos": logs_erroneos
+        }, fj, indent=4, ensure_ascii=False)
+
+    # 2. Guardar archivo .TXT formal para el área encargada
+    ruta_txt = os.path.join(storage_dir, "reporte_area_revision.txt")
+    lineas_txt = [
+        "================================================================================",
+        "         REPORTE OFICIAL DE AUDITORÍA Y REVISIÓN DE LOGS — ÁREA SOC / TI        ",
+        "================================================================================",
+        f"Fecha de emisión        : {fecha_gen}",
+        f"Total de logs procesados: {len(results)}",
+        f"Logs Válidos (Aptos BD) : {len(logs_verificados)}",
+        f"Logs Erróneos (Revisión): {len(logs_erroneos)}",
+        "--------------------------------------------------------------------------------",
+        "SECCIÓN A: LOGS ERRÓNEOS EN CUARENTENA (PARA REVISIÓN DEL ÁREA ENCARGADA)",
+        "--------------------------------------------------------------------------------"
+    ]
+
+    if not logs_erroneos:
+        lineas_txt.append("No se registraron logs erróneos en este lote.")
+    else:
+        for err in logs_erroneos:
+            lineas_txt.append(
+                f"[LÍNEA {err['linea']:02d}] ESTADO: {err['estado']}\n"
+                f"  ├── Log Crudo   : {err['log_original']}\n"
+                f"  ├── Diagnóstico : {err['diagnostico']}\n"
+                f"  └── Acción Área : {err['accion']}\n"
+            )
+
+    lineas_txt.extend([
+        "--------------------------------------------------------------------------------",
+        "SECCIÓN B: LOGS VERIFICADOS CON SELLO CRIPTOGRÁFICO (APTOS PARA BASE DE DATOS)",
+        "--------------------------------------------------------------------------------"
+    ])
+
+    if not logs_verificados:
+        lineas_txt.append("No hay logs verificados en este lote.")
+    else:
+        for ok in logs_verificados:
+            lineas_txt.append(
+                f"[LÍNEA {ok['linea']:02d}] VERIFICADO_OK | SELLO_BD: {ok['sello_bd']}...\n"
+                f"  └── Registro Limpio: {ok['log_original']}\n"
+            )
+
+    lineas_txt.append("================================================================================")
+    with open(ruta_txt, "w", encoding="utf-8") as ft:
+        ft.write("\n".join(lineas_txt))
+
+def analyze_logs_input(raw_input):
+    """Procesa el bloque de texto completo línea por línea y dispara las salidas del profesor."""
+    lines = [line.strip() for line in raw_input.split('\n') if line.strip()]
+    results = []
+    accepted = 0
+    rejected = 0
+    total_tokens = 0
+
+    for idx, line in enumerate(lines, start=1):
+        res = analyze_single_log(line, line_number=idx)
+        results.append(res)
+        
+        if res.get('valid_lexical') and res.get('valid_syntactic') and res.get('valid_semantic'):
+            accepted += 1
+        else:
+            rejected += 1
+        total_tokens += len(res.get('tokens', []))
+
+    # Disparar la generación automática de los archivos solicitados
+    generar_archivos_retroalimentacion(results)
+    # Guardar en almacenamiento general (datos.json y reportes.csv) como ya tenías
+    save_results_to_storage(results)
+
+    summary = {
+        'total_lines': len(lines),
+        'total_tokens': total_tokens,
+        'accepted': accepted,
+        'rejected': rejected
+    }
+
+    return {
+        'log_input': raw_input,
+        'results': results,
+        'summary': summary
+    }

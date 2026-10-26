@@ -11,7 +11,8 @@
                 'valido': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}\n2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"root","ctx":{"port":22}}',
                 'lexico': '2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}',
                 'sintactico': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3',
-                'semantico': '2026-09-20T14:32:05 999.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}'
+                'semantico': '2026-09-20T14:32:05 999.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}',
+                'ataque_bd': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin\'); DROP TABLE logs;--","attempts":3}'
             };
             document.getElementById('log_input').value = samples[type];
         }
@@ -47,6 +48,55 @@
             </div>
         </div>
     </header>
+    <!-- BLOQUE EJECUTIVO: OBSERVACIONES 1, 2 Y 3 DEL PROFESOR -->
+<section class="mb-6 rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
+  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-200 pb-4">
+    <div>
+      <span class="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 uppercase tracking-wide">
+        Arquitectura Formal Pre-SIEM &amp; Escudo de Base de Datos
+      </span>
+      <h2 class="mt-2 text-lg font-bold text-slate-900">
+        ¿Qué hace realmente este proyecto y cómo soluciona la problemática empresarial?
+      </h2>
+    </div>
+
+    <!-- BOTONES DE DESCARGA EXIGIDOS EN LA RETROALIMENTACIÓN (PUNTO 1) -->
+    <div class="flex flex-wrap gap-2">
+      <a href="/descargar/errores-json"
+         class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 transition">
+        <span>📥 Descargar Logs Erróneos (.JSON)</span>
+      </a>
+      <a href="/descargar/reporte-txt"
+         class="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow hover:bg-slate-900 transition">
+        <span>📄 Descargar Formato Área Revisión (.TXT)</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- DESCRIPCIÓN DEL PROYECTO Y SOLUCIÓN DE PROBLEMAS (PUNTO 2 Y PUNTO 3) -->
+  <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-700 leading-relaxed">
+    <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
+      <h3 class="font-bold text-slate-900 mb-1">1. ¿Qué hace realmente el sistema?</h3>
+      <p>
+        Actúa como una <strong>compuerta de validación formal determinista (Pre-SIEM / Pre-BD Gateway)</strong> para un Centro de Operaciones de Seguridad (SOC). Antes de que los logs de firewalls y servidores se almacenen en la base de datos o en el SIEM, el motor los descompone mediante <strong>Expresiones Regulares (AFD/AFND)</strong> y verifica su estructura jerárquica y balanceo de llaves JSON mediante una <strong>Gramática Libre de Contexto (GLC) y un Autómata de Pila (PDA)</strong> en tiempo lineal <code>O(n)</code>.
+      </p>
+    </div>
+
+    <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
+      <h3 class="font-bold text-slate-900 mb-1">2. ¿Cómo soluciona los problemas del SOC?</h3>
+      <p>
+        Elimina la <strong>fatiga de alertas</strong> de los analistas y reduce los <strong>costos de ingesta del SIEM</strong> al filtrar instantáneamente registros corruptos sin depender de modelos de Machine Learning de "caja negra". Separa automáticamente los eventos válidos (priorizados por severidad SLA) y exporta los registros fallidos en <strong>JSON (<code>logs_erroneos.json</code>)</strong> y en un informe <strong>TXT (<code>reporte_area_revision.txt</code>)</strong> para el área encargada de auditoría.
+      </p>
+    </div>
+
+    <div class="rounded-lg bg-emerald-50/70 p-3.5 border border-emerald-300">
+      <h3 class="font-bold text-emerald-950 mb-1">3. Prevención de Corrupción en Base de Datos</h3>
+      <p class="text-emerald-900">
+        Si un log malicioso o fallido imita el formato superficial (p. ej., inyectando comandos SQL/NoSQL como <code>"admin'); DROP TABLE--"</code> dentro de un token <code>STRING</code> o usando IPs/fechas fuera de rango como <code>999.168.1.10</code>), el <strong>Validador Semántico y Escudo Anti-Inyección</strong> lo detecta, lo aísla en cuarentena y solo otorga el <strong>Sello Criptográfico SHA-256</strong> a los logs 100 % íntegros, impidiendo que un log fallido se haga pasar por verificado en la Base de Datos.
+      </p>
+    </div>
+  </div>
+</section>
 
     <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
