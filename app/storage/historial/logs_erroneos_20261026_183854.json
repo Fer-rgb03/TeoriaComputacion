@@ -1,0 +1,31 @@
+{
+    "metadata": {
+        "sistema": "SOC Analyzer & JFLAP Studio (Persistencia en Archivos JSON/CSV/TXT)",
+        "fecha_generacion": "2026-10-26 18:38:54",
+        "id_ejecucion": "20261026_183854",
+        "total_procesados": 4,
+        "total_aceptados": 2,
+        "total_rechazados": 2,
+        "nota_seguridad": "Validación léxica, sintáctica, semántica y filtrado heurístico de entradas. Para futuras integraciones con BD relacionales se requiere uso de consultas parametrizadas."
+    },
+    "logs_erroneos": [
+        {
+            "linea": 3,
+            "log_original": "2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {\"user\":\"admin\"}",
+            "estado_clasificacion": "ERROR LÉXICO",
+            "diagnostico_detallado": [
+                "Línea 3, Col 34: Símbolo ilegal '@' ∉ Σ. El AFD transita al Estado Trampa (qT)."
+            ],
+            "accion_recomendada": "Aislar registro y remitir al Área de Revisión SOC / TI"
+        },
+        {
+            "linea": 4,
+            "log_original": "2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {\"user\":\"admin\",\"attempts\":3",
+            "estado_clasificacion": "ERROR SINTÁCTICO",
+            "diagnostico_detallado": [
+                "Error Sintáctico en token #13: Se esperaba 'RBRACE' pero se encontró 'FIN_DE_CADENA'."
+            ],
+            "accion_recomendada": "Aislar registro y remitir al Área de Revisión SOC / TI"
+        }
+    ]
+}

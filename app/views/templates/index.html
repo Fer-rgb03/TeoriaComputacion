@@ -11,8 +11,8 @@
                 'valido': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}\n2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"root","ctx":{"port":22}}',
                 'lexico': '2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}',
                 'sintactico': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3',
-                'semantico': '2026-09-20T14:32:05 999.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}',
-                'ataque_bd': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin\'); DROP TABLE logs;--","attempts":3}'
+                'semantico': '2026-02-30T14:32:05 999.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}',
+                'seguridad': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin\'); DROP TABLE logs;--","attempts":3}'
             };
             document.getElementById('log_input').value = samples[type];
         }
@@ -38,80 +38,86 @@
             <div class="flex items-center gap-3">
                 <div class="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-pulse"></div>
                 <div>
-                    <h1 class="text-lg font-bold text-white">Analizador Léxico, Sintáctico y Semántico SOC — JFLAP & Tree Visualizer</h1>
+                    <h1 class="text-lg font-bold text-white">Analizador Léxico, Sintáctico y Semántico SOC — JFLAP 7.1 & Tree Visualizer</h1>
                     <p class="text-xs text-slate-400">Teoría de la Computación • USIL 2026 • Estudiante: Fernando Spray Solis</p>
                 </div>
             </div>
             <div class="flex gap-2 text-xs">
-                <span class="px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600 text-amber-200 font-semibold">Gráficos JFLAP 7.1 (AFD / AFND)</span>
-                <span class="px-3 py-1 rounded-full bg-sky-950/80 border border-sky-600 text-sky-200 font-semibold">Árboles Jerárquicos (Raíz → Ramas → Hojas)</span>
+                <span class="px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600 text-amber-200 font-semibold">Exportación Nativa .JFF (JFLAP 7.1)</span>
+                <span class="px-3 py-1 rounded-full bg-sky-950/80 border border-sky-600 text-sky-200 font-semibold">Persistencia en Archivos JSON / CSV / TXT</span>
             </div>
         </div>
     </header>
-    <!-- BLOQUE EJECUTIVO: OBSERVACIONES 1, 2 Y 3 DEL PROFESOR -->
-<section class="mb-6 rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
-  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-200 pb-4">
-    <div>
-      <span class="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 uppercase tracking-wide">
-        Arquitectura Formal Pre-SIEM &amp; Escudo de Base de Datos
-      </span>
-      <h2 class="mt-2 text-lg font-bold text-slate-900">
-        ¿Qué hace realmente este proyecto y cómo soluciona la problemática empresarial?
-      </h2>
-    </div>
-
-    <!-- BOTONES DE DESCARGA EXIGIDOS EN LA RETROALIMENTACIÓN (PUNTO 1) -->
-    <div class="flex flex-wrap gap-2">
-      <a href="/descargar/errores-json"
-         class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 transition">
-        <span>📥 Descargar Logs Erróneos (.JSON)</span>
-      </a>
-      <a href="/descargar/reporte-txt"
-         class="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow hover:bg-slate-900 transition">
-        <span>📄 Descargar Formato Área Revisión (.TXT)</span>
-      </a>
-    </div>
-  </div>
-
-  <!-- DESCRIPCIÓN DEL PROYECTO Y SOLUCIÓN DE PROBLEMAS (PUNTO 2 Y PUNTO 3) -->
-  <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-700 leading-relaxed">
-    <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
-      <h3 class="font-bold text-slate-900 mb-1">1. ¿Qué hace realmente el sistema?</h3>
-      <p>
-        Actúa como una <strong>compuerta de validación formal determinista (Pre-SIEM / Pre-BD Gateway)</strong> para un Centro de Operaciones de Seguridad (SOC). Antes de que los logs de firewalls y servidores se almacenen en la base de datos o en el SIEM, el motor los descompone mediante <strong>Expresiones Regulares (AFD/AFND)</strong> y verifica su estructura jerárquica y balanceo de llaves JSON mediante una <strong>Gramática Libre de Contexto (GLC) y un Autómata de Pila (PDA)</strong> en tiempo lineal <code>O(n)</code>.
-      </p>
-    </div>
-
-    <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
-      <h3 class="font-bold text-slate-900 mb-1">2. ¿Cómo soluciona los problemas del SOC?</h3>
-      <p>
-        Elimina la <strong>fatiga de alertas</strong> de los analistas y reduce los <strong>costos de ingesta del SIEM</strong> al filtrar instantáneamente registros corruptos sin depender de modelos de Machine Learning de "caja negra". Separa automáticamente los eventos válidos (priorizados por severidad SLA) y exporta los registros fallidos en <strong>JSON (<code>logs_erroneos.json</code>)</strong> y en un informe <strong>TXT (<code>reporte_area_revision.txt</code>)</strong> para el área encargada de auditoría.
-      </p>
-    </div>
-
-    <div class="rounded-lg bg-emerald-50/70 p-3.5 border border-emerald-300">
-      <h3 class="font-bold text-emerald-950 mb-1">3. Prevención de Corrupción en Base de Datos</h3>
-      <p class="text-emerald-900">
-        Si un log malicioso o fallido imita el formato superficial (p. ej., inyectando comandos SQL/NoSQL como <code>"admin'); DROP TABLE--"</code> dentro de un token <code>STRING</code> o usando IPs/fechas fuera de rango como <code>999.168.1.10</code>), el <strong>Validador Semántico y Escudo Anti-Inyección</strong> lo detecta, lo aísla en cuarentena y solo otorga el <strong>Sello Criptográfico SHA-256</strong> a los logs 100 % íntegros, impidiendo que un log fallido se haga pasar por verificado en la Base de Datos.
-      </p>
-    </div>
-  </div>
-</section>
 
     <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+        {% if upload_notice %}
+        <div class="rounded-lg border border-amber-600 bg-amber-950/70 px-4 py-3 text-xs text-amber-200">
+            <strong>Aviso de Control de Entrada:</strong> {{ upload_notice }}
+        </div>
+        {% endif %}
+
+        <!-- BLOQUE EJECUTIVO DOCUMENTADO CON PRECISIÓN TÉCNICA -->
+        <section class="rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <span class="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 uppercase tracking-wide">
+                Validación Formal de Logs &amp; Persistencia Auditada en Archivos
+              </span>
+              <h2 class="mt-2 text-lg font-bold text-slate-900">
+                Descripción Funcional, Alcance de Seguridad y Arquitectura de Almacenamiento
+              </h2>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <a href="/descargar/errores-json"
+                 class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 transition">
+                <span>📥 Descargar Logs Rechazados (.JSON)</span>
+              </a>
+              <a href="/descargar/reporte-txt"
+                 class="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow hover:bg-slate-900 transition">
+                <span>📄 Descargar Reporte Área Revisión (.TXT)</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-700 leading-relaxed">
+            <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
+              <h3 class="font-bold text-slate-900 mb-1">1. ¿Qué hace el programa y cómo opera?</h3>
+              <p>
+                Analiza registros de eventos de un SOC mediante cuatro fases secuenciales: <strong>(1) Análisis Léxico</strong> con Expresiones Regulares y Autómatas Finitos (AFD con estado trampa <code>qT</code> y AFND exportables a <code>.jff</code> para JFLAP 7.1), <strong>(2) Análisis Sintáctico</strong> con Gramática Libre de Contexto y Autómata de Pila (PDA), <strong>(3) Validación Semántica</strong> de rangos IPv4 (<code>0..255</code>) y calendario real, y <strong>(4) Filtrado de entradas sospechosas</strong>.
+              </p>
+            </div>
+
+            <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
+              <h3 class="font-bold text-slate-900 mb-1">2. Arquitectura de Archivos e Historial</h3>
+              <p>
+                El sistema prescinde de un motor de base de datos relacional y persiste los resultados en archivos planos estructurados (<code>datos.json</code>, <code>reportes.csv</code>, <code>logs_erroneos.json</code> y <code>reporte_area_revision.txt</code>), conservando copias con marca de tiempo en <code>app/storage/historial/</code> para evitar el sobrescrito accidental entre ejecuciones.
+              </p>
+            </div>
+
+            <div class="rounded-lg bg-emerald-50/70 p-3.5 border border-emerald-300">
+              <h3 class="font-bold text-emerald-950 mb-1">3. Alcance de Seguridad e Integridad</h3>
+              <p class="text-emerald-900">
+                Aplica límites de longitud, validación por tipo de dato, rechazo de caracteres de control y detección heurística de secuencias sospechosas (SQLi/NoSQLi/XSS). Los registros aceptados reciben un código <strong>HMAC-SHA256 completo (64 caracteres)</strong> para control de integridad de archivo. Si en el futuro se integra una base de datos relacional, deberán emplearse consultas parametrizadas (<em>Prepared Statements</em>) y controles de acceso.
+              </p>
+            </div>
+          </div>
+        </section>
 
         <!-- CONSOLA DE ENTRADA Y SUBIDA DE ARCHIVO TXT -->
         <section class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
             <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                 <div>
-                    <h2 class="text-base font-semibold text-white">1. Entrada de Logs de Seguridad del SOC (Texto o Archivo .txt)</h2>
+                    <h2 class="text-base font-semibold text-white">1. Entrada de Logs de Seguridad del SOC (Texto o Archivo .txt / .log máx. 1 MB)</h2>
                     <p class="text-xs text-slate-400">Estructura del lenguaje formal: <code class="text-emerald-400">TIMESTAMP IP SEVERITY EVENT_TYPE PAYLOAD</code></p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button type="button" onclick="loadSample('valido')" class="text-xs px-3 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 transition">Ejemplo Válido + Anidado</button>
                     <button type="button" onclick="loadSample('lexico')" class="text-xs px-3 py-1.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700 transition">Error Léxico (@)</button>
                     <button type="button" onclick="loadSample('sintactico')" class="text-xs px-3 py-1.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 transition">Error Sintáctico (Falta })</button>
-                    <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Error Semántico (IP 999)</button>
+                    <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Error Semántico (30 Feb / IP 999)</button>
+                    <button type="button" onclick="loadSample('seguridad')" class="text-xs px-3 py-1.5 rounded bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 transition">Entrada Sospechosa (Inyección)</button>
                 </div>
             </div>
 
@@ -122,19 +128,19 @@
 
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-3">
-                        <label class="text-xs text-slate-300 font-medium">Subir archivo <code class="text-emerald-400">.txt</code>:</label>
+                        <label class="text-xs text-slate-300 font-medium">Subir archivo <code class="text-emerald-400">.txt / .log</code>:</label>
                         <input type="file" name="txt_file" accept=".txt,.log"
                             class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700"/>
                     </div>
                     <button type="submit"
                         class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg transition">
-                        Analizar y Generar Gráficos JFLAP + Árboles Reales
+                        Analizar y Generar Gráficos JFLAP (.JFF) + Árboles
                     </button>
                 </div>
             </form>
         </section>
 
-        <!-- TARJETAS DE RESUMEN -->
+        <!-- TARJETAS DE RESUMEN COHERENTES CON EL RESULTADO FINAL -->
         <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <p class="text-xs text-slate-400">Logs Analizados</p>
@@ -145,11 +151,11 @@
                 <p class="text-2xl font-bold text-sky-400 mt-1">{{ summary.total_tokens }}</p>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p class="text-xs text-slate-400">Logs Válidos (Accept)</p>
+                <p class="text-xs text-slate-400">Logs Aceptados (Válidos)</p>
                 <p class="text-2xl font-bold text-emerald-400 mt-1">{{ summary.accepted }}</p>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p class="text-xs text-slate-400">Logs con Error (Reject)</p>
+                <p class="text-xs text-slate-400">Logs Rechazados (Con Error)</p>
                 <p class="text-2xl font-bold text-rose-400 mt-1">{{ summary.rejected }}</p>
             </div>
         </section>
@@ -158,7 +164,7 @@
         <div class="border-b border-slate-800 flex flex-wrap gap-2">
             <button id="btn-tab-tokens" onclick="switchMainTab('tab-tokens')"
                 class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-emerald-500 text-emerald-400 bg-slate-800/90 rounded-t-lg transition">
-                1. Tokens, Lexemas, Autómatas JFLAP y Árboles por cada Token
+                1. Tokens, Lexemas, Autómatas JFLAP (.JFF) y Árboles por Token
             </button>
             <button id="btn-tab-arboles-gen" onclick="switchMainTab('tab-arboles-gen')"
                 class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
@@ -166,18 +172,21 @@
             </button>
         </div>
 
-        <!-- ================================================================== -->
-        <!-- PESTAÑA 1: TOKENS, LEXEMAS, JFLAP Y ÁRBOLES POR CADA TOKEN         -->
-        <!-- ================================================================== -->
+        <!-- PESTAÑA 1 -->
         <div id="tab-tokens" class="main-tab-content space-y-8">
             {% for res in results %}
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
                 <div class="flex flex-wrap justify-between items-center gap-4 border-b border-slate-800 pb-4">
-                    <div>
+                    <div class="space-y-1">
                         <span class="text-xs font-mono uppercase text-slate-400">Log Línea #{{ res.line_number }}</span>
-                        <p class="font-mono text-sm text-slate-100 mt-1 break-all">{{ res.raw }}</p>
+                        <p class="font-mono text-sm text-slate-100 break-all">{{ res.raw }}</p>
+                        {% if res.integrity_hmac %}
+                        <p class="text-[11px] font-mono text-emerald-400 break-all">
+                            <strong>HMAC-SHA256 (Integridad):</strong> {{ res.integrity_hmac }}
+                        </p>
+                        {% endif %}
                     </div>
-                    {% if res.status == 'VÁLIDO (ACEPTADO)' %}
+                    {% if res.is_valid %}
                         <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-700">✅ {{ res.status }}</span>
                     {% else %}
                         <span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-400 border border-rose-700">❌ {{ res.status }}</span>
@@ -186,7 +195,7 @@
 
                 {% if res.errors %}
                 <div class="bg-rose-950/60 border border-rose-800 rounded-lg p-4 text-xs text-rose-200 space-y-1">
-                    <p class="font-bold text-rose-400">Reporte de Error Detectado:</p>
+                    <p class="font-bold text-rose-400">Diagnóstico de Validación:</p>
                     {% for err in res.errors %}
                         <p>• {{ err }}</p>
                     {% endfor %}
@@ -203,7 +212,7 @@
                                 <th class="p-3 border border-slate-700">Lexema Reconocido</th>
                                 <th class="p-3 border border-slate-700">Categoría Léxica</th>
                                 <th class="p-3 border border-slate-700">Expresión Regular</th>
-                                <th class="p-3 border border-slate-700">Estado Semántico</th>
+                                <th class="p-3 border border-slate-700">Validación Semántica y Seguridad</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-800">
@@ -230,9 +239,8 @@
                 <!-- INSPECTOR JFLAP Y ÁRBOLES POR CADA TOKEN -->
                 <div class="space-y-4 pt-2">
                     <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider">
-                        Gráficos JFLAP (AFD y AFND) y Árboles (Sintáctico y Semántico) de cada Token Reconocido
+                        Gráficos JFLAP 7.1 (AFD con Estado Trampa qT y AFND) y Árboles de cada Token
                     </h3>
-                    <p class="text-xs text-slate-400">Despliega cualquier token para ver su ventana JFLAP 7.1 (triángulo inicial, estados amarillos, doble círculo final y tabla Multiple Run) y sus árboles reales con raíz y ramas:</p>
 
                     {% for tok in res.tokens %}
                     <details class="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden group" {% if loop.first %}open{% endif %}>
@@ -242,12 +250,10 @@
                                 <span class="font-mono text-sm text-white font-bold">{{ tok.value }}</span>
                                 <span class="text-xs text-slate-400">({{ tok.categoria }})</span>
                             </div>
-                            <span class="text-xs text-emerald-400 font-semibold">▼ Ver Diagramas JFLAP y Árboles del Token</span>
+                            <span class="text-xs text-emerald-400 font-semibold">▼ Ver Diagramas JFLAP (.JFF), Tabla δ y Árboles</span>
                         </summary>
 
                         <div class="p-5 space-y-6 border-t border-slate-800">
-
-                            <!-- VENTANAS JFLAP: AFD Y AFND LADO A LADO -->
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <!-- VENTANA JFLAP AFD -->
                                 <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
@@ -256,7 +262,7 @@
                                         <span class="font-mono text-[11px] bg-amber-200 px-2 py-0.5 rounded border border-amber-500">{{ tok.quintupla_afd.delta }}</span>
                                     </div>
                                     <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
-                                        S = {{ tok.quintupla_afd.Q }} | Σ = {{ tok.quintupla_afd.Sigma }} | S0 = {{ tok.quintupla_afd.q0 }} | F = {{ tok.quintupla_afd.F }}
+                                        Q = {{ tok.quintupla_afd.Q }} | Σ = {{ tok.quintupla_afd.Sigma }} | q0 = {{ tok.quintupla_afd.q0 }} | F = {{ tok.quintupla_afd.F }}
                                     </div>
                                     {{ tok.jflap_afd_svg | safe }}
                                 </div>
@@ -264,11 +270,11 @@
                                 <!-- VENTANA JFLAP AFND -->
                                 <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
                                     <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
-                                        <span>☕ JFLAP 7.1 — AFN (No Determinista) para {{ tok.type }}</span>
+                                        <span>☕ JFLAP 7.1 — AFND (No Determinista) para {{ tok.type }}</span>
                                         <span class="font-mono text-[11px] bg-sky-200 px-2 py-0.5 rounded border border-sky-500">{{ tok.quintupla_afnd.delta }}</span>
                                     </div>
                                     <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
-                                        S' = {{ tok.quintupla_afnd.Q }} | Σ = {{ tok.quintupla_afnd.Sigma }} | S0 = {{ tok.quintupla_afnd.q0 }} | F' = {{ tok.quintupla_afnd.F }}
+                                        Q' = {{ tok.quintupla_afnd.Q }} | Σ = {{ tok.quintupla_afnd.Sigma }} | q0 = {{ tok.quintupla_afnd.q0 }} | F' = {{ tok.quintupla_afnd.F }}
                                     </div>
                                     {{ tok.jflap_afnd_svg | safe }}
                                 </div>
@@ -281,8 +287,8 @@
                                     <thead>
                                         <tr class="bg-slate-800 text-slate-300">
                                             <th class="p-2 border border-slate-700">Input (Cadena Evaluada)</th>
-                                            <th class="p-2 border border-slate-700">Result (JFLAP)</th>
-                                            <th class="p-2 border border-slate-700">Justificación Formal</th>
+                                            <th class="p-2 border border-slate-700">Result (JFLAP 7.1)</th>
+                                            <th class="p-2 border border-slate-700">Traza Formal de Estados</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -297,7 +303,7 @@
                                 </table>
                             </div>
 
-                            <!-- ÁRBOL SINTÁCTICO Y SEMÁNTICO REAL DEL TOKEN -->
+                            <!-- ÁRBOL SINTÁCTICO Y SEMÁNTICO DEL TOKEN -->
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <div class="bg-slate-900 p-4 rounded-lg border border-slate-800 space-y-2">
                                     <h4 class="text-xs font-bold text-sky-400 uppercase">Árbol Sintáctico del Token (Raíz, Ramas y Hojas)</h4>
@@ -311,7 +317,6 @@
                                     {{ tok.sem_tree_svg | safe }}
                                 </div>
                             </div>
-
                         </div>
                     </details>
                     {% endfor %}
@@ -320,9 +325,7 @@
             {% endfor %}
         </div>
 
-        <!-- ================================================================== -->
-        <!-- PESTAÑA 2: ÁRBOLES SINTÁCTICOS Y SEMÁNTICOS GENERALES              -->
-        <!-- ================================================================== -->
+        <!-- PESTAÑA 2 -->
         <div id="tab-arboles-gen" class="main-tab-content hidden space-y-8">
             {% for res in results %}
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
@@ -334,7 +337,6 @@
                     <span class="text-xs font-mono px-3 py-1 rounded bg-slate-800 text-slate-200">{{ res.status }}</span>
                 </div>
 
-                <!-- TRAZA DEL AUTÓMATA DE PILA (PDA) -->
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-4">
                     <h4 class="text-xs font-bold text-amber-400 uppercase mb-2">Traza de Aceptación del Autómata de Pila (PDA) — Balanceo de Llaves en PAYLOAD</h4>
                     <ul class="text-xs font-mono text-slate-300 space-y-1">
@@ -348,7 +350,7 @@
                 <div class="space-y-6">
                     <div class="bg-slate-950 border border-slate-800 rounded-lg p-5 space-y-3">
                         <h4 class="text-sm font-bold text-sky-400 uppercase">
-                            Árbol Sintáctico General (Grafo Jerárquico: Raíz S = LOG, Ramas/Aristas, Nodos Interiores y Nodos Hoja)
+                            Árbol Sintáctico General (Raíz S = LOG, Ramas/Aristas, Nodos Interiores y Nodos Hoja)
                         </h4>
                         {{ res.general_syn_svg | safe }}
                         <div class="bg-slate-900 p-3 rounded border border-slate-800 text-xs font-mono text-slate-300 break-all">
@@ -358,7 +360,7 @@
 
                     <div class="bg-slate-950 border border-slate-800 rounded-lg p-5 space-y-3">
                         <h4 class="text-sm font-bold text-purple-400 uppercase">
-                            Árbol Semántico General (AST Decorado con Validación de Tipos, Rangos IP/Fecha y Prioridad SOC)
+                            Árbol Semántico General (AST Decorado con Validación de Calendario, Rangos IPv4 y SLA SOC)
                         </h4>
                         {{ res.general_sem_svg | safe }}
                     </div>

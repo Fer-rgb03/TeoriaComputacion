@@ -1,5 +1,5 @@
-Linea,Estado,Total_Tokens,Log_Crudo
-1,VÁLIDO (ACEPTADO),13,"2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {""user"":""admin"",""attempts"":3}"
-2,VÁLIDO (ACEPTADO),17,"2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {""user"":""root"",""ctx"":{""port"":22}}"
-3,ERROR LÉXICO,9,"2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {""user"":""admin""}"
-4,ERROR SINTÁCTICO,12,"2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {""user"":""admin"",""attempts"":3"
+Linea,Estado,Valido,Total_Tokens,HMAC_SHA256,Log_Crudo
+1,VÁLIDO (ACEPTADO),True,13,a069717082d9373ddf25ef984d9b66a7f287fdafe4c487586966c692e6d5b35e,"2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {""user"":""admin"",""attempts"":3}"
+2,VÁLIDO (ACEPTADO),True,17,ff53eeca96bc9c262f81a99c5cce37cd38554cf30d0e02bff771740e1457efff,"2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {""user"":""root"",""ctx"":{""port"":22}}"
+3,ERROR LÉXICO,False,9,N/A,"2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {""user"":""admin""}"
+4,ERROR SINTÁCTICO,False,12,N/A,"2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {""user"":""admin"",""attempts"":3"

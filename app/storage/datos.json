@@ -2,22 +2,28 @@
   {
     "linea": 1,
     "log_crudo": "2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {\"user\":\"admin\",\"attempts\":3}",
+    "valido": true,
     "estado": "VÁLIDO (ACEPTADO)",
     "total_tokens": 13,
+    "hmac_sha256": "a069717082d9373ddf25ef984d9b66a7f287fdafe4c487586966c692e6d5b35e",
     "errores": []
   },
   {
     "linea": 2,
     "log_crudo": "2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {\"user\":\"root\",\"ctx\":{\"port\":22}}",
+    "valido": true,
     "estado": "VÁLIDO (ACEPTADO)",
     "total_tokens": 17,
+    "hmac_sha256": "ff53eeca96bc9c262f81a99c5cce37cd38554cf30d0e02bff771740e1457efff",
     "errores": []
   },
   {
     "linea": 3,
     "log_crudo": "2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {\"user\":\"admin\"}",
+    "valido": false,
     "estado": "ERROR LÉXICO",
     "total_tokens": 9,
+    "hmac_sha256": null,
     "errores": [
       "Línea 3, Col 34: Símbolo ilegal '@' ∉ Σ. El AFD transita al Estado Trampa (qT)."
     ]
@@ -25,8 +31,10 @@
   {
     "linea": 4,
     "log_crudo": "2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {\"user\":\"admin\",\"attempts\":3",
+    "valido": false,
     "estado": "ERROR SINTÁCTICO",
     "total_tokens": 12,
+    "hmac_sha256": null,
     "errores": [
       "Error Sintáctico en token #13: Se esperaba 'RBRACE' pero se encontró 'FIN_DE_CADENA'."
     ]
