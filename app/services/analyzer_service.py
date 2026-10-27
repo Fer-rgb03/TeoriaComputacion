@@ -136,7 +136,7 @@ def analyze_single_log(log_line, line_number=1):
             )
             continue
 
-        jflap_afd_svg, jflap_afnd_svg, jflap_runs = build_jflap_models_for_token(kind, value)
+        jflap_afd_svg, jflap_afnd_svg, jflap_runs, quintupla_afd, quintupla_afnd = build_jflap_models_for_token(kind, value)
         syn_svg, sem_svg, paren_rep, sem_ok, sem_msg = build_token_real_trees(kind, value)
 
         # Punto 3 y 4: Reforzar validación semántica estricta en cada token
@@ -154,6 +154,9 @@ def analyze_single_log(log_line, line_number=1):
             except ValueError:
                 sem_ok, sem_msg = False, "Constante entera inválida."
 
+
+       # Recibe las quíntuplas directamente del generador del autómata (Punto 2.1: 0% discrepancias)
+        
         meta = grammar.TOKEN_METADATA.get(kind, {})
 
         tok_obj = TokenModel(
@@ -164,8 +167,8 @@ def analyze_single_log(log_line, line_number=1):
             column=col,
             categoria=meta.get('categoria', ''),
             regex=meta.get('regex', ''),
-            quintupla_afd=meta.get('quintupla_afd', {}),
-            quintupla_afnd=meta.get('quintupla_afnd', {}),
+            quintupla_afd=quintupla_afd,
+            quintupla_afnd=quintupla_afnd,
             jflap_afd_svg=jflap_afd_svg,
             jflap_afnd_svg=jflap_afnd_svg,
             jflap_runs=jflap_runs,

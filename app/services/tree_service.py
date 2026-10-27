@@ -1,273 +1,346 @@
+import re
+import calendar
 from app.utils.helpers import escape_svg_text
 
-def tree_to_parentheses(node):
-    lbl = node['label']
-    if not node.get('children'):
-        return lbl
-    inner = ", ".join(tree_to_parentheses(c) for c in node['children'])
-    return f"( {lbl} ( {inner} ) )"
+SUSPICIOUS_TREE_PATTERNS = re.compile(
+    r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|TRUNCATE)\b|--|;|\bOR\b\s+['\"\d]+=['\"\d]+|"
+    r"\$ne|\$gt|\$lt|\$where|<script|javascript:|\.\./|\x00)",
+    re.IGNORECASE
+)
 
-def render_real_tree_svg(root_node, tree_kind="syntactic"):
-    leaf_spacing = 118
-    level_height = 92
 
-    def compute_width(node):
-        children = node.get('children', [])
-        if not children:
-            node['_width'] = leaf_spacing
-            return leaf_spacing
-        total = sum(compute_width(c) for c in children)
-        node['_width'] = max(leaf_spacing, total)
-        return node['_width']
+def compute_tree_layout(node, depth=0, x_Step=118, y_step=76, counter=None):
+    if counter is None:
+        counter = [0]
+    children = node.get('children', [])
+    node['depth'] = depth
+    node['y'] = 44 + depth * y_step
 
-    def compute_depth(node):
-        children = node.get('children', [])
-        if not children:
-            return 1
-        return 1 + max(compute_depth(c) for c in children)
-
-    total_w = max(560, compute_width(root_node) + 60)
-    max_d = compute_depth(root_node)
-    total_h = max(220, max_d * level_height + 55)
-
-    edges = []
-    nodes_list = []
-
-    def assign_coords(node, left_x, depth, is_root=False):
-        w = node['_width']
-        cx = left_x + w / 2.0
-        cy = 48 + depth * level_height
-        node['_x'] = cx
-        node['_y'] = cy
-        children = node.get('children', [])
-        node['_role'] = 'root' if is_root else ('leaf' if not children else 'internal')
-        nodes_list.append(node)
-
-        cur_x = left_x
+    if not children:
+        node['x'] = 68 + counter[0] * x_Step
+        counter[0] += 1
+    else:
         for ch in children:
-            assign_coords(ch, cur_x, depth + 1, is_root=False)
-            edges.append((cx, cy, ch['_x'], ch['_y']))
-            cur_x += ch['_width']
+            compute_tree_layout(ch, depth + 1, x_Step, y_step, counter)
+        node['x'] = (children[0]['x'] + children[-1]['x']) / 2.0
 
-    assign_coords(root_node, (total_w - root_node['_width']) / 2.0, 0, is_root=True)
+    return counter[0]
 
-    svg = [
-        f'<svg viewBox="0 0 {int(total_w)} {int(total_h)}" class="w-full h-auto rounded-lg border border-slate-300 bg-white shadow-inner" xmlns="http://www.w3.org/2000/svg">',
-        '<defs>',
-        '  <filter id="tree-shadow" x="-10%" y="-10%" width="125%" height="125%">',
-        '    <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" flood-opacity="0.16"/>',
-        '  </filter>',
-        '</defs>',
-        f'<rect width="{int(total_w)}" height="{int(total_h)}" fill="#ffffff"/>',
-        '<g transform="translate(14, 18)" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold">',
-        '  <circle cx="8" cy="0" r="6" fill="#fef08a" stroke="#1e293b" stroke-width="1.8"/>',
-        '  <text x="19" y="4" fill="#1e293b">Nodo Raíz (Nivel 1)</text>',
-        '  <circle cx="145" cy="0" r="6" fill="#dbeafe" stroke="#1e3a8a" stroke-width="1.5"/>',
-        '  <text x="156" y="4" fill="#1e3a8a">Nodo Interior (No Terminal)</text>',
-        '  <circle cx="325" cy="0" r="6" fill="#dcfce7" stroke="#166534" stroke-width="1.5"/>',
-        '  <text x="336" y="4" fill="#166534">Nodo Hoja (Terminal / Lexema)</text>',
-        '</g>'
-    ]
 
-    for x1, y1, x2, y2 in edges:
-        svg.append(
-            f'<line x1="{x1:.1f}" y1="{y1 + 20:.1f}" x2="{x2:.1f}" y2="{y2 - 20:.1f}" '
-            f'stroke="#1e293b" stroke-width="1.8"/>'
-        )
+def get_max_depth(node):
+    children = node.get('children', [])
+    if not children:
+        return node.get('depth', 0)
+    return max(get_max_depth(ch) for ch in children)
 
-    for n in nodes_list:
-        x, y = n['_x'], n['_y']
-        role = n['_role']
+
+def tree_to_parentheses(node):
+    lbl = node.get('label', '')
+    sub = node.get('sub', '')
+    head = f"{lbl}:{sub}" if sub else lbl
+    children = node.get('children', [])
+    if not children:
+        return head
+    inner = ", ".join(tree_to_parentheses(ch) for ch in children)
+    return f"( {head} ( {inner} ) )"
+
+
+def render_real_tree_svg(root, tree_kind="syntactic"):
+    x_step = 112
+    y_step = 78
+    leaf_count = compute_tree_layout(root, 0, x_step, y_step)
+    max_depth = get_max_depth(root)
+
+    width = max(560, int(leaf_count * x_step + 90))
+    height = max(210, int((max_depth + 1) * y_step + 55))
+
+    if tree_kind == "syntactic":
+        root_fill, root_stroke = "#fef3c7", "#b45309"
+        int_fill, int_stroke = "#e0f2fe", "#0369a1"
+        leaf_fill, leaf_stroke = "#dcfce7", "#15803d"
+    else:
+        root_fill, root_stroke = "#f3e8ff", "#6d28d9"
+        int_fill, int_stroke = "#fae8ff", "#a21caf"
+        leaf_fill, leaf_stroke = "#fef9c3", "#a16207"
+
+    edges_svg = []
+    nodes_svg = []
+
+    def traverse(n, is_root=False):
+        children = n.get('children', [])
+        x, y = n['x'], n['y']
+        for ch in children:
+            cx, cy = ch['x'], ch['y']
+            edges_svg.append(
+                f'<line x1="{x:.1f}" y1="{y + 18:.1f}" x2="{cx:.1f}" y2="{cy - 20:.1f}" '
+                f'stroke="#334155" stroke-width="1.8" marker-end="url(#tree-arrow)"/>'
+            )
+            traverse(ch, is_root=False)
+
+        if is_root:
+            fill, stroke = root_fill, root_stroke
+            role_tag = "Raíz (Nivel 1)"
+        elif children:
+            fill, stroke = int_fill, int_stroke
+            role_tag = f"Nodo Interior (Niv. {n['depth']+1})"
+        else:
+            fill, stroke = leaf_fill, leaf_stroke
+            role_tag = "Nodo Hoja"
+
         lbl = escape_svg_text(n.get('label', ''))
         sub = escape_svg_text(n.get('sub', ''))
 
-        if role == 'root':
-            fill, stroke, text_col = "#fef08a", "#0f172a", "#0f172a"
-            rx, ry = max(32, len(lbl) * 4.5 + 14), 22
-            svg.append(f'<ellipse cx="{x:.1f}" cy="{y:.1f}" rx="{rx:.1f}" ry="{ry}" fill="{fill}" stroke="{stroke}" stroke-width="2.2" filter="url(#tree-shadow)"/>')
-            svg.append(f'<ellipse cx="{x:.1f}" cy="{y:.1f}" rx="{rx-4:.1f}" ry="{ry-4}" fill="none" stroke="{stroke}" stroke-width="1"/>')
-        elif role == 'internal':
-            fill = "#f3e8ff" if tree_kind == "semantic" else "#dbeafe"
-            stroke = "#6b21a8" if tree_kind == "semantic" else "#1e40af"
-            text_col = "#1e1b4b"
-            rx, ry = max(28, len(lbl) * 4.2 + 12), 20
-            svg.append(f'<ellipse cx="{x:.1f}" cy="{y:.1f}" rx="{rx:.1f}" ry="{ry}" fill="{fill}" stroke="{stroke}" stroke-width="1.8" filter="url(#tree-shadow)"/>')
-        else:
-            fill = "#fae8ff" if tree_kind == "semantic" else "#dcfce7"
-            stroke = "#86198f" if tree_kind == "semantic" else "#15803d"
-            text_col = "#052e16"
-            rx, ry = max(26, max(len(lbl), len(sub)) * 3.8 + 12), 21
-            svg.append(f'<ellipse cx="{x:.1f}" cy="{y:.1f}" rx="{rx:.1f}" ry="{ry}" fill="{fill}" stroke="{stroke}" stroke-width="1.8" filter="url(#tree-shadow)"/>')
+        box_w = max(88, max(len(lbl), len(sub)) * 6.8 + 20)
+        box_h = 38 if sub else 28
 
+        nodes_svg.append(
+            f'<rect x="{x - box_w/2:.1f}" y="{y - box_h/2:.1f}" width="{box_w:.1f}" height="{box_h:.1f}" '
+            f'rx="7" fill="{fill}" stroke="{stroke}" stroke-width="1.8"/>'
+        )
         if sub:
-            svg.append(f'<text x="{x:.1f}" y="{y - 2:.1f}" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="{text_col}">{lbl}</text>')
-            svg.append(f'<text x="{x:.1f}" y="{y + 11:.1f}" text-anchor="middle" font-family="monospace" font-size="10" font-weight="bold" fill="#b91c1c">{sub}</text>')
+            nodes_svg.append(
+                f'<text x="{x:.1f}" y="{y - 3:.1f}" text-anchor="middle" font-family="Arial, sans-serif" '
+                f'font-size="10.5" font-weight="bold" fill="#0f172a">{lbl}</text>'
+            )
+            nodes_svg.append(
+                f'<text x="{x:.1f}" y="{y + 11:.1f}" text-anchor="middle" font-family="monospace" '
+                f'font-size="9.5" fill="#334155">{sub}</text>'
+            )
         else:
-            svg.append(f'<text x="{x:.1f}" y="{y + 4:.1f}" text-anchor="middle" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="{text_col}">{lbl}</text>')
+            nodes_svg.append(
+                f'<text x="{x:.1f}" y="{y + 4:.1f}" text-anchor="middle" font-family="Arial, sans-serif" '
+                f'font-size="11" font-weight="bold" fill="#0f172a">{lbl}</text>'
+            )
 
-    svg.append('</svg>')
+        nodes_svg.append(
+            f'<text x="{x:.1f}" y="{y - box_h/2 - 5:.1f}" text-anchor="middle" font-family="Arial, sans-serif" '
+            f'font-size="8.5" fill="#64748b">{role_tag}</text>'
+        )
+
+    traverse(root, is_root=True)
+
+    svg = [
+        f'<svg viewBox="0 0 {width} {height}" class="w-full h-auto rounded-lg border border-slate-300 bg-white shadow-sm" xmlns="http://www.w3.org/2000/svg">',
+        '<defs>',
+        '  <marker id="tree-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto">',
+        '    <path d="M 0 1 L 10 5 L 0 9 z" fill="#334155"/>',
+        '  </marker>',
+        '</defs>',
+        f'<rect width="{width}" height="{height}" fill="#ffffff"/>',
+        *edges_svg,
+        *nodes_svg,
+        '</svg>'
+    ]
     return '\n'.join(svg)
 
 
-def build_token_real_trees(tok_type, value):
+def build_token_real_trees(tok_type, val):
+    """
+    Puntos 2.3, 2.4 y 2.9: Construye el Árbol Sintáctico y el Árbol Semántico de cada token
+    aplicando exactamente las mismas reglas de calendario (incluyendo años bisiestos),
+    octetos IPv4 (0..255 sin ceros iniciales ambiguos) y seguridad de cadenas.
+    """
     if tok_type == 'TIMESTAMP':
-        yr, mo, dy = value[0:4], value[5:7], value[8:10]
-        hr, mn, sc = value[11:13], value[14:16], value[17:19]
-        valid_date = (1 <= int(mo) <= 12) and (1 <= int(dy) <= 31) and (0 <= int(hr) <= 23) and (0 <= int(mn) <= 59) and (0 <= int(sc) <= 59)
-        syn_dict = {
+        y_str, m_str, d_str = val[0:4], val[5:7], val[8:10]
+        hh_str, mm_str, ss_str = val[11:13], val[14:16], val[17:19]
+
+        y_int, m_int, d_int = int(y_str), int(m_str), int(d_str)
+        hh_int, mm_int, ss_int = int(hh_str), int(mm_str), int(ss_str)
+
+        errors_ts = []
+        if not (1970 <= y_int <= 2100):
+            errors_ts.append(f"Año fuera de rango ({y_int})")
+        if not (1 <= m_int <= 12):
+            errors_ts.append(f"Mes inválido ({m_int}; rango 01..12)")
+            max_day = 31
+        else:
+            max_day = calendar.monthrange(y_int, m_int)[1]
+            if not (1 <= d_int <= max_day):
+                bisiesto_str = "bisiesto" if calendar.isleap(y_int) else "no bisiesto"
+                errors_ts.append(f"Día inválido ({d_int}) para mes {m_int:02d}/{y_int} ({bisiesto_str}, máx {max_day})")
+        if not (0 <= hh_int <= 23):
+            errors_ts.append(f"Hora inválida ({hh_int}; rango 00..23)")
+        if not (0 <= mm_int <= 59):
+            errors_ts.append(f"Minuto inválido ({mm_int}; rango 00..59)")
+        if not (0 <= ss_int <= 59):
+            errors_ts.append(f"Segundo inválido ({ss_int}; rango 00..59)")
+
+        sem_ok = len(errors_ts) == 0
+        sem_msg = "Fecha/hora ISO-8601 válida en calendario" if sem_ok else " | ".join(errors_ts)
+
+        syn_tree = {
             'label': 'TIMESTAMP',
             'children': [
                 {'label': 'FECHA', 'children': [
-                    {'label': 'AÑO', 'sub': yr},
-                    {'label': 'GUION', 'sub': '-'},
-                    {'label': 'MES', 'sub': mo},
-                    {'label': 'GUION', 'sub': '-'},
-                    {'label': 'DÍA', 'sub': dy}
+                    {'label': 'AAAA', 'sub': y_str},
+                    {'label': 'SEP', 'sub': '-'},
+                    {'label': 'MM', 'sub': m_str},
+                    {'label': 'SEP', 'sub': '-'},
+                    {'label': 'DD', 'sub': d_str}
                 ]},
                 {'label': 'SEP_T', 'sub': 'T'},
                 {'label': 'HORA', 'children': [
-                    {'label': 'HH', 'sub': hr},
-                    {'label': 'DP', 'sub': ':'},
-                    {'label': 'MM', 'sub': mn},
-                    {'label': 'DP', 'sub': ':'},
-                    {'label': 'SS', 'sub': sc}
+                    {'label': 'HH', 'sub': hh_str},
+                    {'label': 'SEP', 'sub': ':'},
+                    {'label': 'MI', 'sub': mm_str},
+                    {'label': 'SEP', 'sub': ':'},
+                    {'label': 'SS', 'sub': ss_str}
                 ]}
             ]
         }
-        sem_status = "VÁLIDO (ISO-8601)" if valid_date else "FUERA DE RANGO"
-        sem_dict = {
+        sem_tree = {
             'label': 'TIMESTAMP.sem',
-            'sub': 'DateTime',
+            'sub': 'Calendario OK' if sem_ok else 'ERROR CALENDARIO',
             'children': [
-                {'label': 'Valor Canónico', 'sub': value},
-                {'label': 'Validación Calendario', 'children': [
-                    {'label': f'Mes ({mo})', 'sub': '∈ [01..12]' if 1 <= int(mo) <= 12 else 'ERROR > 12'},
-                    {'label': f'Día ({dy})', 'sub': '∈ [01..31]' if 1 <= int(dy) <= 31 else 'ERROR > 31'},
-                    {'label': f'Hora ({hr}:{mn}:{sc})', 'sub': '∈ [00..23:59]'}
+                {'label': 'Fecha', 'sub': f"{y_str}-{m_str}-{d_str}", 'children': [
+                    {'label': 'Mes (1..12)', 'sub': f"{m_int} ({'OK' if 1<=m_int<=12 else 'ERR'})"},
+                    {'label': f'Día (1..{max_day})', 'sub': f"{d_int} ({'OK' if 1<=m_int<=12 and 1<=d_int<=max_day else 'ERR'})"}
+                ]},
+                {'label': 'Reloj 24h', 'sub': f"{hh_str}:{mm_str}:{ss_str}", 'children': [
+                    {'label': 'HH (0..23)', 'sub': f"{hh_int} ({'OK' if 0<=hh_int<=23 else 'ERR'})"},
+                    {'label': 'MI:SS (0..59)', 'sub': f"{mm_int}:{ss_int} ({'OK' if 0<=mm_int<=59 and 0<=ss_int<=59 else 'ERR'})"}
                 ]}
             ]
         }
-        return render_real_tree_svg(syn_dict, "syntactic"), render_real_tree_svg(sem_dict, "semantic"), tree_to_parentheses(syn_dict), valid_date, sem_status
 
     elif tok_type == 'IP':
-        octs = value.split('.')
-        valid_ip = all(0 <= int(o) <= 255 for o in octs)
-        syn_dict = {
+        parts = val.split('.')
+        oct_errors = []
+        oct_nodes_sem = []
+
+        for idx, p in enumerate(parts, start=1):
+            if len(p) > 1 and p.startswith('0'):
+                oct_errors.append(f"Octeto #{idx} ({p}) con cero inicial no permitido")
+                oct_ok = False
+            else:
+                v_int = int(p)
+                oct_ok = (0 <= v_int <= 255)
+                if not oct_ok:
+                    oct_errors.append(f"Octeto #{idx} ({v_int}) fuera de rango [0..255]")
+            oct_nodes_sem.append({
+                'label': f'Octeto {idx}',
+                'sub': f"{p} ({'0..255 OK' if oct_ok else 'INVÁLIDO'})"
+            })
+
+        sem_ok = (len(parts) == 4) and (len(oct_errors) == 0)
+        sem_msg = "IPv4 válida (octetos en 0..255)" if sem_ok else " | ".join(oct_errors)
+
+        syn_tree = {
             'label': 'IP',
             'children': [
-                {'label': 'OCTETO_1', 'sub': octs[0]},
-                {'label': 'PUNTO', 'sub': '.'},
-                {'label': 'OCTETO_2', 'sub': octs[1]},
-                {'label': 'PUNTO', 'sub': '.'},
-                {'label': 'OCTETO_3', 'sub': octs[2]},
-                {'label': 'PUNTO', 'sub': '.'},
-                {'label': 'OCTETO_4', 'sub': octs[3]}
+                {'label': 'OCT_1', 'sub': parts[0]},
+                {'label': 'DOT', 'sub': '.'},
+                {'label': 'OCT_2', 'sub': parts[1]},
+                {'label': 'DOT', 'sub': '.'},
+                {'label': 'OCT_3', 'sub': parts[2]},
+                {'label': 'DOT', 'sub': '.'},
+                {'label': 'OCT_4', 'sub': parts[3]}
             ]
         }
-        sem_status = "VÁLIDO (Octetos 0..255)" if valid_ip else "ERROR SEMÁNTICO (Octeto > 255)"
-        zona = "Red Privada SOC" if octs[0] in ('10', '172', '192') else "Red Pública"
-        sem_dict = {
+        sem_tree = {
             'label': 'IP.sem',
-            'sub': 'IPv4Address',
-            'children': [
-                {'label': 'Zona Red', 'sub': zona},
-                {'label': 'Rango Octetos [0..255]', 'children': [
-                    {'label': f'Oct 1 ({octs[0]})', 'sub': 'OK ≤ 255' if int(octs[0]) <= 255 else 'ERR > 255'},
-                    {'label': f'Oct 2 ({octs[1]})', 'sub': 'OK ≤ 255' if int(octs[1]) <= 255 else 'ERR > 255'},
-                    {'label': f'Oct 3 ({octs[2]})', 'sub': 'OK ≤ 255' if int(octs[2]) <= 255 else 'ERR > 255'},
-                    {'label': f'Oct 4 ({octs[3]})', 'sub': 'OK ≤ 255' if int(octs[3]) <= 255 else 'ERR > 255'}
-                ]}
-            ]
+            'sub': 'IPv4 VÁLIDA' if sem_ok else 'ERROR RANGO IPv4',
+            'children': oct_nodes_sem
         }
-        return render_real_tree_svg(syn_dict, "syntactic"), render_real_tree_svg(sem_dict, "semantic"), tree_to_parentheses(syn_dict), valid_ip, sem_status
 
     elif tok_type == 'SEVERITY':
-        prio_map = {
-            'INFO': ('Nivel 1 (Bajo)', 'Log Informativo'),
-            'WARNING': ('Nivel 2 (Medio)', 'Alerta Preventiva'),
-            'ERROR': ('Nivel 3 (Alto)', 'Incidente Activo'),
-            'CRITICAL': ('Nivel 4 (Crítico)', 'Escalamiento Inmediato')
+        sla_map = {
+            'INFO': ('Prioridad P4', 'Informativo'),
+            'WARNING': ('Prioridad P3', 'SLA < 4 horas'),
+            'ERROR': ('Prioridad P2', 'SLA < 1 hora'),
+            'CRITICAL': ('Prioridad P1', 'SLA < 15 min')
         }
-        prio, SLA = prio_map.get(value, ('Desconocido', 'N/A'))
-        syn_dict = {
-            'label': 'SEVERITY',
-            'children': [
-                {'label': 'PALABRA_RESERVADA', 'children': [{'label': f'char[{i}]', 'sub': c} for i, c in enumerate(value)]}
-            ]
-        }
-        sem_dict = {
+        prio, sla = sla_map.get(val, ('Desconocido', 'N/A'))
+        sem_ok = val in sla_map
+        sem_msg = f"{prio} ({sla})"
+
+        syn_tree = {'label': 'SEVERITY', 'children': [{'label': 'LITERAL_ENUM', 'sub': val}]}
+        sem_tree = {
             'label': 'SEVERITY.sem',
-            'sub': 'Enum(Severidad)',
+            'sub': prio,
             'children': [
-                {'label': 'Lexema', 'sub': value},
-                {'label': 'Prioridad SOC', 'sub': prio},
-                {'label': 'Acción SLA', 'sub': SLA}
+                {'label': 'Nivel', 'sub': val},
+                {'label': 'Respuesta SOC', 'sub': sla}
             ]
         }
-        return render_real_tree_svg(syn_dict, "syntactic"), render_real_tree_svg(sem_dict, "semantic"), tree_to_parentheses(syn_dict), True, f"Prioridad: {prio}"
 
     elif tok_type == 'EVENT_TYPE':
-        parts = value.split('_')
-        ch_nodes = []
-        for idx_p, p in enumerate(parts):
-            if idx_p > 0:
-                ch_nodes.append({'label': 'SEP', 'sub': '_'})
-            ch_nodes.append({'label': f'ID_{idx_p+1}', 'sub': p})
-        syn_dict = {'label': 'EVENT_TYPE', 'children': ch_nodes}
-        sem_dict = {
+        parts = val.split('_')
+        sem_ok = True
+        sem_msg = "Taxonomía de evento SOC registrada"
+        syn_tree = {
+            'label': 'EVENT_TYPE',
+            'children': [{'label': f'PALABRA_{i+1}', 'sub': p} for i, p in enumerate(parts)]
+        }
+        sem_tree = {
             'label': 'EVENT_TYPE.sem',
-            'sub': 'EventCode',
+            'sub': 'Categoría SOC',
             'children': [
-                {'label': 'Código', 'sub': value},
-                {'label': 'Clasificación', 'sub': 'Seguridad SOC'},
-                {'label': 'Norma', 'sub': 'SBS 504-2021'}
+                {'label': 'Identificador', 'sub': val},
+                {'label': 'Normativa', 'sub': 'SBS 504-2021'}
             ]
         }
-        return render_real_tree_svg(syn_dict, "syntactic"), render_real_tree_svg(sem_dict, "semantic"), tree_to_parentheses(syn_dict), True, "Identificador Válido"
 
     elif tok_type == 'STRING':
-        clean_s = value[1:-1]
-        syn_dict = {
+        inner = val[1:-1]
+        match_susp = SUSPICIOUS_TREE_PATTERNS.search(inner)
+        has_ctrl = any(ord(c) < 32 for c in inner)
+
+        if has_ctrl:
+            sem_ok = False
+            sem_msg = "Contiene caracteres de control ASCII no permitidos"
+        elif match_susp:
+            sem_ok = False
+            sem_msg = f"Entrada sospechosa detectada ({match_susp.group(0)!r}): posible vector de inyección"
+        else:
+            sem_ok = True
+            sem_msg = f"Cadena verificada (long={len(inner)})"
+
+        syn_tree = {
             'label': 'STRING',
             'children': [
-                {'label': 'COMILLA_INI', 'sub': '"'},
-                {'label': 'CONTENIDO', 'sub': clean_s or 'ε'},
-                {'label': 'COMILLA_FIN', 'sub': '"'}
+                {'label': 'QUOTE_OPEN', 'sub': '"'},
+                {'label': 'CONTENIDO', 'sub': inner or 'ε'},
+                {'label': 'QUOTE_CLOSE', 'sub': '"'}
             ]
         }
-        sem_dict = {
+        sem_tree = {
             'label': 'STRING.sem',
-            'sub': 'UTF-8 String',
+            'sub': 'Cadena Segura' if sem_ok else 'ALERTA SEGURIDAD',
             'children': [
-                {'label': 'Valor Literal', 'sub': clean_s},
-                {'label': 'Longitud', 'sub': f'{len(clean_s)} chars'}
+                {'label': 'Valor', 'sub': inner[:24] + ('...' if len(inner) > 24 else '') or 'vacío'},
+                {'label': 'Inspección', 'sub': 'Limpio' if sem_ok else 'Patrón Sospechoso'}
             ]
         }
-        return render_real_tree_svg(syn_dict, "syntactic"), render_real_tree_svg(sem_dict, "semantic"), tree_to_parentheses(syn_dict), True, f"String (len={len(clean_s)})"
 
     elif tok_type == 'NUMBER':
-        syn_dict = {
-            'label': 'NUMBER',
-            'children': [{'label': f'Dígito_{i+1}', 'sub': d} for i, d in enumerate(value)]
-        }
-        sem_dict = {
+        num_val = int(val)
+        sem_ok = (0 <= num_val <= 10**9)
+        sem_msg = f"Entero válido ({num_val})" if sem_ok else f"Entero fuera de rango ({num_val})"
+        syn_tree = {'label': 'NUMBER', 'children': [{'label': 'DIGITOS', 'sub': val}]}
+        sem_tree = {
             'label': 'NUMBER.sem',
-            'sub': 'Integer (int64)',
+            'sub': 'int64',
             'children': [
-                {'label': 'Valor Numérico', 'sub': str(int(value))},
-                {'label': 'Base', 'sub': 'Decimal (10)'}
+                {'label': 'Valor Numérico', 'sub': str(num_val)},
+                {'label': 'Rango', 'sub': '0..10^9 OK' if sem_ok else 'Fuera de rango'}
             ]
         }
-        return render_real_tree_svg(syn_dict, "syntactic"), render_real_tree_svg(sem_dict, "semantic"), tree_to_parentheses(syn_dict), True, f"Entero = {int(value)}"
 
     else:
-        syn_dict = {'label': tok_type, 'children': [{'label': 'TERMINAL', 'sub': value}]}
-        sem_dict = {
+        sem_ok = True
+        sem_msg = "Delimitador estructural JSON"
+        syn_tree = {'label': tok_type, 'children': [{'label': 'SIMBOLO', 'sub': val}]}
+        sem_tree = {
             'label': f'{tok_type}.sem',
             'sub': 'Delimitador GLC',
-            'children': [
-                {'label': 'Símbolo', 'sub': value},
-                {'label': 'Operación PDA', 'sub': 'Control JSON'}
-            ]
+            'children': [{'label': 'Símbolo', 'sub': val}]
         }
-        return render_real_tree_svg(syn_dict, "syntactic"), render_real_tree_svg(sem_dict, "semantic"), tree_to_parentheses(syn_dict), True, "Delimitador Estructural"
+
+    return (
+        render_real_tree_svg(syn_tree, "syntactic"),
+        render_real_tree_svg(sem_tree, "semantic"),
+        tree_to_parentheses(syn_tree),
+        sem_ok,
+        sem_msg
+    )
