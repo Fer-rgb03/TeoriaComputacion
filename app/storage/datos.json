@@ -6,6 +6,7 @@
     "estado": "VÁLIDO (ACEPTADO)",
     "total_tokens": 13,
     "hmac_sha256": "a069717082d9373ddf25ef984d9b66a7f287fdafe4c487586966c692e6d5b35e",
+    "hmac_verificado": true,
     "errores": []
   },
   {
@@ -15,6 +16,7 @@
     "estado": "VÁLIDO (ACEPTADO)",
     "total_tokens": 17,
     "hmac_sha256": "ff53eeca96bc9c262f81a99c5cce37cd38554cf30d0e02bff771740e1457efff",
+    "hmac_verificado": true,
     "errores": []
   },
   {
@@ -24,6 +26,7 @@
     "estado": "ERROR LÉXICO",
     "total_tokens": 9,
     "hmac_sha256": null,
+    "hmac_verificado": false,
     "errores": [
       "Línea 3, Col 34: Símbolo ilegal '@' ∉ Σ. El AFD transita al Estado Trampa (qT)."
     ]
@@ -35,6 +38,7 @@
     "estado": "ERROR SINTÁCTICO",
     "total_tokens": 12,
     "hmac_sha256": null,
+    "hmac_verificado": false,
     "errores": [
       "Error Sintáctico en token #13: Se esperaba 'RBRACE' pero se encontró 'FIN_DE_CADENA'."
     ]

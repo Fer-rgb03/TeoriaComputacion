@@ -1,5 +1,6 @@
 import re
 
+
 class GrammarSingleton:
     _instance = None
 
@@ -10,76 +11,65 @@ class GrammarSingleton:
         return cls._instance
 
     def _init_grammar(self):
+        # Punto 2.5: STRING admite secuencias de escape JSON válidas (\", \\, \/, \b, \f, \n, \r, \t, \uXXXX)
         self.TOKEN_SPECS = [
             ('TIMESTAMP',  r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'),
-            ('IP',         r'(\d{1,3}\.){3}\d{1,3}'),
-            ('SEVERITY',   r'INFO|WARNING|ERROR|CRITICAL'),
-            ('EVENT_TYPE', r'[A-Z]+(_[A-Z]+)*'),
+            ('IP',         r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'),
+            ('SEVERITY',   r'\b(?:INFO|WARNING|ERROR|CRITICAL)\b'),
+            ('EVENT_TYPE', r'\b[A-Z]+(?:_[A-Z]+)*\b'),
             ('LBRACE',     r'\{'),
             ('RBRACE',     r'\}'),
-            ('STRING',     r'"[^"]*"'),
             ('COLON',      r':'),
             ('COMMA',      r','),
-            ('NUMBER',     r'\d+'),
-            ('SPACE',      r'[ \t\r]+'),
+            ('STRING',     r'"(?:\\["\\/bfnrt]|\\u[0-9a-fA-F]{4}|[^"\\\x00-\x1f])*"'),
+            ('NUMBER',     r'\b\d+\b'),
+            ('SPACE',      r'[ \t]+'),
             ('NEWLINE',    r'\n'),
             ('MISMATCH',   r'.'),
         ]
+
         self.TOK_REGEX = '|'.join(f'(?P<{name}>{pattern})' for name, pattern in self.TOKEN_SPECS)
 
-        self.DEFAULT_LOGS = (
-            '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}\n'
-            '2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"root","ctx":{"port":22}}'
-        )
-
+        # Punto 2.1 y 2.2: Metadatos sincronizados con las definiciones formales y alfabetos explícitos
         self.TOKEN_METADATA = {
             'TIMESTAMP': {
-                'categoria': 'Fecha / Hora ISO-8601',
-                'regex': r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}',
-                'quintupla_afd': {'Q': '{q0..q19, qT}', 'Sigma': '{0-9, -, T, :}', 'q0': 'q0', 'F': '{q19}', 'delta': 'f: Q × Σ → Q'},
-                'quintupla_afnd': {'Q': '{q0..q19}', 'Sigma': '{0-9, -, T, :}', 'q0': 'q0', 'F': '{q19}', 'delta': 'f: Q × Σ → P(Q)'}
+                'categoria': 'Marca Temporal ISO-8601',
+                'regex': r'[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]',
             },
             'IP': {
                 'categoria': 'Dirección de Red IPv4',
-                'regex': r'(\d{1,3}\.){3}\d{1,3}',
-                'quintupla_afd': {'Q': '{q0..q5, qT}', 'Sigma': '{0-9, .}', 'q0': 'q0', 'F': '{q5}', 'delta': 'f: Q × Σ → Q'},
-                'quintupla_afnd': {'Q': '{q0..q5}', 'Sigma': '{0-9, .}', 'q0': 'q0', 'F': '{q5}', 'delta': 'f: Q × Σ → P(Q)'}
+                'regex': r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}',
             },
             'SEVERITY': {
-                'categoria': 'Nivel de Severidad (Enum)',
-                'regex': r'INFO|WARNING|ERROR|CRITICAL',
-                'quintupla_afd': {'Q': '{q0, qI, qW, qE, qC, qF, qT}', 'Sigma': '{A-Z}', 'q0': 'q0', 'F': '{qF}', 'delta': 'f: Q × Σ → Q'},
-                'quintupla_afnd': {'Q': '{q0, qI, qW, qE, qC, qF}', 'Sigma': '{A-Z, λ}', 'q0': 'q0', 'F': '{qF}', 'delta': 'f: Q × (Σ∪{λ}) → P(Q)'}
+                'categoria': 'Palabra Reservada de Criticidad',
+                'regex': r'(INFO|WARNING|ERROR|CRITICAL)',
             },
             'EVENT_TYPE': {
                 'categoria': 'Identificador de Evento SOC',
                 'regex': r'[A-Z]+(_[A-Z]+)*',
-                'quintupla_afd': {'Q': '{q0, q1, q2, qT}', 'Sigma': '{A-Z, _}', 'q0': 'q0', 'F': '{q1}', 'delta': 'f: Q × Σ → Q'},
-                'quintupla_afnd': {'Q': '{q0, q1, q2}', 'Sigma': '{A-Z, _}', 'q0': 'q0', 'F': '{q1}', 'delta': 'f: Q × Σ → P(Q)'}
             },
             'STRING': {
-                'categoria': 'Literal de Cadena JSON',
-                'regex': r'"[^"]*"',
-                'quintupla_afd': {'Q': '{q0, q1, q2, qT}', 'Sigma': '{" , ASCII}', 'q0': 'q0', 'F': '{q2}', 'delta': 'f: Q × Σ → Q'},
-                'quintupla_afnd': {'Q': '{q0, q1, q2}', 'Sigma': '{" , ASCII}', 'q0': 'q0', 'F': '{q2}', 'delta': 'f: Q × Σ → P(Q)'}
+                'categoria': 'Literal de Cadena JSON (con soporte de escape \\")',
+                'regex': r'"(\Sigma_{base} | \\["\\/bfnrt])*"',
             },
             'NUMBER': {
-                'categoria': 'Constante Numérica JSON',
-                'regex': r'\d+',
-                'quintupla_afd': {'Q': '{q0, q1, qT}', 'Sigma': '{0-9}', 'q0': 'q0', 'F': '{q1}', 'delta': 'f: Q × Σ → Q'},
-                'quintupla_afnd': {'Q': '{q0, q1}', 'Sigma': '{0-9}', 'q0': 'q0', 'F': '{q1}', 'delta': 'f: Q × Σ → P(Q)'}
+                'categoria': 'Constante Entera No Negativa',
+                'regex': r'[0-9]+',
+            },
+            'LBRACE': {
+                'categoria': 'Delimitador Apertura JSON',
+                'regex': r'\{',
+            },
+            'RBRACE': {
+                'categoria': 'Delimitador Cierre JSON',
+                'regex': r'\}',
+            },
+            'COLON': {
+                'categoria': 'Separador Clave-Valor JSON',
+                'regex': r':',
+            },
+            'COMMA': {
+                'categoria': 'Separador de Atributos JSON',
+                'regex': r',',
             }
         }
-
-        for d_tok, sym_c, d_desc in [
-            ('LBRACE', '{', 'Inicio de Objeto JSON'),
-            ('RBRACE', '}', 'Fin de Objeto JSON'),
-            ('COLON', ':', 'Separador Clave-Valor'),
-            ('COMMA', ',', 'Separador de Campos')
-        ]:
-            self.TOKEN_METADATA[d_tok] = {
-                'categoria': d_desc,
-                'regex': f'\\{sym_c}' if sym_c in '{}' else sym_c,
-                'quintupla_afd': {'Q': '{q0, q1, qT}', 'Sigma': f'{{{sym_c}}}', 'q0': 'q0', 'F': '{q1}', 'delta': 'f: Q × Σ → Q'},
-                'quintupla_afnd': {'Q': '{q0, q1}', 'Sigma': f'{{{sym_c}}}', 'q0': 'q0', 'F': '{q1}', 'delta': 'f: Q × Σ → P(Q)'}
-            }

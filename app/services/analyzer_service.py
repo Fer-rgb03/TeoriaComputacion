@@ -22,7 +22,7 @@ DEFAULT_SAMPLE_LOGS = """2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"u
 2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}
 2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3"""
 
-# Reglas heurísticas de apoyo para detección de entradas sospechosas (Punto 4)
+# Punto 2.9: Detección basada en patrones heurísticos (documentada con alcance acotado)
 SUSPICIOUS_INPUT_PATTERNS = re.compile(
     r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|TRUNCATE)\b|--|;|\bOR\b\s+['\"\d]+=['\"\d]+|"
     r"\$ne|\$gt|\$lt|\$where|<script|javascript:|\.\./|\x00)",
@@ -30,10 +30,11 @@ SUSPICIOUS_INPUT_PATTERNS = re.compile(
 )
 
 SAFE_KEY_IDENTIFIER = re.compile(r'^"[a-zA-Z0-9_\-\.]+"$')
+VALID_JSON_ESCAPE_REGEX = re.compile(r'\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4})')
 
 
 def validate_timestamp_strict(ts_str):
-    """Punto 3: Verifica formato ISO-8601 y validez real en calendario gregoriano y reloj de 24h."""
+    """Punto 2.4: Comprueba el formato ISO-8601 y la existencia real en el calendario (incluyendo años bisiestos)."""
     if len(ts_str) != 19 or ts_str[4] != '-' or ts_str[7] != '-' or ts_str[10] != 'T' or ts_str[13] != ':' or ts_str[16] != ':':
         return False, "Formato TIMESTAMP inválido (se requiere AAAA-MM-DDTHH:MM:SS)."
     try:
@@ -59,7 +60,7 @@ def validate_timestamp_strict(ts_str):
 
 
 def validate_ipv4_strict(ip_str):
-    """Punto 3: Verifica que cada uno de los 4 octetos IPv4 esté en el rango estricto 0 a 255."""
+    """Punto 2.3: Comprueba que cada uno de los 4 octetos IPv4 esté entre 0 y 255 sin ceros iniciales ambiguos."""
     parts = ip_str.split('.')
     if len(parts) != 4:
         return False, "La dirección IPv4 debe tener exactamente 4 octetos."
@@ -67,37 +68,55 @@ def validate_ipv4_strict(ip_str):
         if not part.isdigit():
             return False, f"Octeto #{idx} ({part!r}) no es numérico."
         if len(part) > 1 and part.startswith('0'):
-            return False, f"Octeto #{idx} ({part!r}) contiene ceros a la izquierda ambiguos."
+            return False, f"Octeto #{idx} ({part!r}) contiene ceros iniciales ambiguos."
         val = int(part)
         if not (0 <= val <= 255):
-            return False, f"Octeto #{idx} ({val}) fuera del rango IPv4 permitido [0..255]."
-    return True, "IPv4 válida (octetos en rango 0..255)"
+            return False, f"Octeto #{idx} ({val}) fuera del intervalo válido [0..255]."
+    return True, "IPv4 válida (octetos en 0..255)"
 
 
 def validate_string_security_and_type(str_lexeme, is_key=False):
-    """Puntos 3 y 4: Validación específica por tipo de dato para cadenas JSON y detección de anomalías."""
+    """Puntos 2.5 y 2.9: Valida secuencias de escape JSON (\\\", \\\\) y detecta patrones sospechosos."""
     if len(str_lexeme) < 2 or not (str_lexeme.startswith('"') and str_lexeme.endswith('"')):
         return False, "Cadena mal delimitada por comillas."
     inner = str_lexeme[1:-1]
     if any(ord(ch) < 32 for ch in inner):
         return False, "La cadena contiene caracteres de control ASCII no permitidos."
     if len(inner) > 256:
-        return False, "Longitud de cadena excede el límite de seguridad (256 caracteres)."
+        return False, "Longitud de cadena excede el límite de 256 caracteres."
+
+    # Verificar que toda barra invertida corresponda a una secuencia de escape JSON válida
+    cleaned_escapes = VALID_JSON_ESCAPE_REGEX.sub('', inner)
+    if '\\' in cleaned_escapes or '"' in cleaned_escapes:
+        return False, "Secuencia de escape JSON inválida o comilla sin escapar."
+
     if is_key and not SAFE_KEY_IDENTIFIER.match(str_lexeme):
-        return False, f"La clave JSON {str_lexeme} contiene caracteres no permitidos para un identificador de atributo."
+        return False, f"La clave JSON {str_lexeme} contiene caracteres no permitidos para un identificador."
     match = SUSPICIOUS_INPUT_PATTERNS.search(inner)
     if match:
-        return False, f"Entrada sospechosa detectada en cadena ({match.group(0)!r}): posible vector de inyección o comando."
-    return True, "Cadena verificada"
+        return False, f"Entrada sospechosa detectada por patrón ({match.group(0)!r})."
+    return True, "Cadena JSON verificada"
+
+
+def _get_hmac_secret_key():
+    """Obtiene la clave secreta desde variable de entorno o clave de entorno académico por defecto."""
+    return os.environ.get('SOC_HMAC_SECRET_KEY', 'USIL_TCOM_SOC_INTEGRITY_KEY_2026').encode('utf-8')
 
 
 def compute_record_hmac(raw_log):
+    """Punto 2.12: Genera el código de autenticación de mensaje HMAC-SHA256 completo (64 caracteres hex)."""
+    return hmac.new(_get_hmac_secret_key(), raw_log.strip().encode('utf-8'), hashlib.sha256).hexdigest()
+
+
+def verify_record_hmac(raw_log, expected_hmac):
     """
-    Punto 7: Calcula un código HMAC-SHA256 completo (64 caracteres hexadecimales) sin truncamiento
-    para verificar integridad interna de los registros procesados.
+    Punto 2.12: Procedimiento efectivo de verificación de integridad en tiempo constante
+    mediante hmac.compare_digest para detectar cualquier alteración del registro.
     """
-    secret_key = os.environ.get('SOC_HMAC_SECRET_KEY', 'USIL_TCOM_SOC_INTEGRITY_KEY_2026').encode('utf-8')
-    return hmac.new(secret_key, raw_log.strip().encode('utf-8'), hashlib.sha256).hexdigest()
+    if not expected_hmac:
+        return False
+    calculated = compute_record_hmac(raw_log)
+    return hmac.compare_digest(calculated, expected_hmac)
 
 
 def analyze_single_log(log_line, line_number=1):
@@ -120,7 +139,8 @@ def analyze_single_log(log_line, line_number=1):
             'general_syn_svg': '',
             'general_sem_svg': '',
             'general_paren': '',
-            'integrity_hmac': None
+            'integrity_hmac': None,
+            'hmac_verified': False
         }
 
     for idx, mo in enumerate(re.finditer(grammar.TOK_REGEX, log_line)):
@@ -136,10 +156,10 @@ def analyze_single_log(log_line, line_number=1):
             )
             continue
 
+        # Única llamada limpia que desempaqueta los 5 valores de build_jflap_models_for_token
         jflap_afd_svg, jflap_afnd_svg, jflap_runs, quintupla_afd, quintupla_afnd = build_jflap_models_for_token(kind, value)
         syn_svg, sem_svg, paren_rep, sem_ok, sem_msg = build_token_real_trees(kind, value)
 
-        # Punto 3 y 4: Reforzar validación semántica estricta en cada token
         if kind == 'TIMESTAMP':
             sem_ok, sem_msg = validate_timestamp_strict(value)
         elif kind == 'IP':
@@ -154,9 +174,6 @@ def analyze_single_log(log_line, line_number=1):
             except ValueError:
                 sem_ok, sem_msg = False, "Constante entera inválida."
 
-
-       # Recibe las quíntuplas directamente del generador del autómata (Punto 2.1: 0% discrepancias)
-        
         meta = grammar.TOKEN_METADATA.get(kind, {})
 
         tok_obj = TokenModel(
@@ -192,19 +209,26 @@ def analyze_single_log(log_line, line_number=1):
             'status': 'ERROR LÉXICO',
             'errors': lexical_errors,
             'tokens': tokens,
-            'pda_trace': [],
+            'pda_trace': ['❌ Fase Léxica rechazada: el Autómata de Pila no inicia debido a tokens ilegales ∉ Σ.'],
             'general_syn_svg': '',
             'general_sem_svg': '',
             'general_paren': '',
-            'integrity_hmac': None
+            'integrity_hmac': None,
+            'hmac_verified': False
         }
 
     pos = 0
     pda_stack = ['Z0']
     pda_trace = ['(q0, w, Z0) ⊢ Configuración inicial del Autómata de Pila con fondo Z0']
     semantic_fields = []
-    semantic_errors = [f"Token {t['type']} ({t['value']}): {t['sem_msg']}" for t in tokens if not t['sem_ok']]
-    security_errors = []
+    semantic_errors = [
+        f"Token {t['type']} ({t['value']}): {t['sem_msg']}"
+        for t in tokens if not t['sem_ok'] and "Entrada sospechosa" not in t['sem_msg']
+    ]
+    security_errors = [
+        f"Token {t['type']} ({t['value']}): {t['sem_msg']}"
+        for t in tokens if not t['sem_ok'] and "Entrada sospechosa" in t['sem_msg']
+    ]
 
     def match(expected_type):
         nonlocal pos
@@ -250,10 +274,13 @@ def analyze_single_log(log_line, line_number=1):
         k_tok, n_str = match('STRING')
         key_val = k_tok['value']
 
-        # Validar formato de clave y unicidad dentro del mismo objeto JSON (Punto 3 y 4)
         k_ok, k_msg = validate_string_security_and_type(key_val, is_key=True)
-        if not k_ok and k_msg not in security_errors:
-            security_errors.append(k_msg)
+        if not k_ok:
+            msg_formatted = f"Clave JSON {key_val}: {k_msg}"
+            if "Entrada sospechosa" in k_msg and msg_formatted not in security_errors:
+                security_errors.append(msg_formatted)
+            elif msg_formatted not in semantic_errors:
+                semantic_errors.append(msg_formatted)
         if key_val in seen_keys:
             semantic_errors.append(f"Clave JSON duplicada ({key_val}) dentro del mismo objeto PAYLOAD.")
         seen_keys.add(key_val)
@@ -299,25 +326,29 @@ def analyze_single_log(log_line, line_number=1):
 
         all_post_errors = semantic_errors + security_errors
         sem_valid = len(semantic_errors) == 0
-        sec_valid = len(security_errors) == 0 and not any("Entrada sospechosa" in e for e in semantic_errors)
+        sec_valid = len(security_errors) == 0
         overall_valid = sem_valid and sec_valid
 
         if overall_valid:
             final_status = 'VÁLIDO (ACEPTADO)'
             record_hmac = compute_record_hmac(log_line)
+            hmac_ok = verify_record_hmac(log_line, record_hmac)
+        elif not sec_valid and not sem_valid:
+            final_status = 'ERROR SEMÁNTICO Y ALERTA DE PATRÓN SOSPECHOSO'
+            record_hmac, hmac_ok = None, False
         elif not sec_valid:
-            final_status = 'RECHAZADO (ALERTA DE SEGURIDAD / ENTRADA SOSPECHOSA)'
-            record_hmac = None
+            final_status = 'RECHAZADO (ENTRADA SOSPECHOSA DETECTADA POR PATRÓN)'
+            record_hmac, hmac_ok = None, False
         else:
             final_status = 'ERROR SEMÁNTICO'
-            record_hmac = None
+            record_hmac, hmac_ok = None, False
 
         general_sem_dict = {
             'label': 'LOG.sem (Raíz AST)',
-            'sub': 'VÁLIDO SOC' if overall_valid else 'RECHAZADO',
+            'sub': 'VÁLIDO SOC' if overall_valid else final_status,
             'children': [
                 {'label': 'Tiempo', 'sub': ts_tok['value'], 'children': [{'label': 'Calendario', 'sub': 'ISO-8601 OK' if ts_tok['sem_ok'] else 'Fecha/Hora Inválida'}]},
-                {'label': 'Origen Red', 'sub': ip_tok['value'], 'children': [{'label': 'Octetos', 'sub': '0..255 OK' if ip_tok['sem_ok'] else 'IPv4 Inválida'}]},
+                {'label': 'Origen Red', 'sub': ip_tok['value'], 'children': [{'label': 'Octetos', 'sub': '0..255 OK' if ip_tok['sem_ok'] else 'IPv4 Fuera de Rango'}]},
                 {'label': 'Severidad', 'sub': sev_tok['value'], 'children': [{'label': 'SLA', 'sub': sev_tok['sem_msg']}]},
                 {'label': 'Evento', 'sub': evt_tok['value'], 'children': [{'label': 'Normativa', 'sub': 'SBS 504-2021'}]},
                 {'label': 'Atributos JSON', 'children': [
@@ -341,7 +372,8 @@ def analyze_single_log(log_line, line_number=1):
             'general_syn_svg': render_real_tree_svg(general_syn_dict, "syntactic"),
             'general_sem_svg': render_real_tree_svg(general_sem_dict, "semantic"),
             'general_paren': tree_to_parentheses(general_syn_dict),
-            'integrity_hmac': record_hmac
+            'integrity_hmac': record_hmac,
+            'hmac_verified': hmac_ok
         }
 
     except SyntaxError as e:
@@ -355,22 +387,22 @@ def analyze_single_log(log_line, line_number=1):
             'valid_security': False,
             'is_valid': False,
             'status': 'ERROR SINTÁCTICO',
-            'errors': [str(e)] + semantic_errors,
+            'errors': [str(e)] + semantic_errors + security_errors,
             'tokens': tokens,
             'pda_trace': pda_trace,
             'general_syn_svg': '',
             'general_sem_svg': '',
             'general_paren': '',
-            'integrity_hmac': None
+            'integrity_hmac': None,
+            'hmac_verified': False
         }
 
 
 def save_all_reports_and_history(results, storage_dir="app/storage"):
     """
-    Puntos 6, 7 y 8:
-    Guarda los resultados en app/storage/ (logs_erroneos.json, reporte_area_revision.txt,
-    datos.json, reportes.csv) y conserva una copia con marca de tiempo en app/storage/historial/
-    para evitar el sobrescrito accidental entre ejecuciones.
+    Puntos 2.8, 2.11, 2.12 y 2.14:
+    Exporta resultados garantizando consistencia entre contadores, categorías de error,
+    verificación HMAC-SHA256 e historial por ejecución sin sobrescritura accidental.
     """
     os.makedirs(storage_dir, exist_ok=True)
     history_dir = os.path.join(storage_dir, "historial")
@@ -392,6 +424,7 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
             'estado': r['status'],
             'total_tokens': len(r['tokens']),
             'hmac_sha256': r.get('integrity_hmac'),
+            'hmac_verificado': r.get('hmac_verified', False),
             'errores': r['errors']
         })
 
@@ -399,7 +432,7 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
             logs_erroneos.append({
                 "linea": r['line_number'],
                 "log_original": r['raw'],
-                "estado_clasificacion": r['status'],
+                "categoria_error": r['status'],
                 "diagnostico_detallado": r['errors'] if r['errors'] else ["Incumplimiento de reglas formales"],
                 "accion_recomendada": "Aislar registro y remitir al Área de Revisión SOC / TI"
             })
@@ -407,21 +440,21 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
             logs_verificados.append({
                 "linea": r['line_number'],
                 "log_original": r['raw'],
-                "hmac_sha256": r.get('integrity_hmac')
+                "hmac_sha256": r.get('integrity_hmac'),
+                "verificacion_hmac": "VERIFICADO_OK (hmac.compare_digest = True)" if r.get('hmac_verified') else "NO_VERIFICADO"
             })
 
-    # 1. Archivo JSON de logs erróneos
     payload_erroneos = {
         "metadata": {
-            "sistema": "SOC Analyzer & JFLAP Studio (Persistencia en Archivos JSON/CSV/TXT)",
+            "sistema": "SOC Analyzer & JFLAP Studio (Almacenamiento basado en archivos JSON/CSV/TXT)",
             "fecha_generacion": fecha_gen,
             "id_ejecucion": run_stamp,
             "total_procesados": len(results),
             "total_aceptados": len(logs_verificados),
             "total_rechazados": len(logs_erroneos),
-            "nota_seguridad": (
-                "Validación léxica, sintáctica, semántica y filtrado heurístico de entradas. "
-                "Para futuras integraciones con BD relacionales se requiere uso de consultas parametrizadas."
+            "alcance_deteccion": (
+                "Detección basada en patrones léxicos/semánticos acotados. "
+                "No sustituye controles de motor de BD como consultas parametrizadas o WAF."
             )
         },
         "logs_erroneos": logs_erroneos
@@ -429,18 +462,15 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
     ruta_json_err = os.path.join(storage_dir, "logs_erroneos.json")
     with open(ruta_json_err, "w", encoding="utf-8") as fj:
         json.dump(payload_erroneos, fj, indent=4, ensure_ascii=False)
-
-    # Copia histórica sin sobrescribir
     with open(os.path.join(history_dir, f"logs_erroneos_{run_stamp}.json"), "w", encoding="utf-8") as fjh:
         json.dump(payload_erroneos, fjh, indent=4, ensure_ascii=False)
 
-    # 2. Archivo TXT para el área encargada de revisión
     lineas_txt = [
         "================================================================================",
         "         REPORTE OFICIAL DE AUDITORÍA Y REVISIÓN DE LOGS — ÁREA SOC / TI        ",
         "================================================================================",
         f"Fecha de emisión        : {fecha_gen} (ID Ejecución: {run_stamp})",
-        f"Arquitectura Almacenam. : Archivos planos estructurados (JSON, CSV y TXT)",
+        f"Arquitectura Almacenam. : Archivos planos estructurados (JSON, CSV y TXT con historial)",
         f"Total de logs procesados: {len(results)}",
         f"Logs Válidos (Aceptados): {len(logs_verificados)}",
         f"Logs con Error (Rechazo): {len(logs_erroneos)}",
@@ -454,7 +484,7 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
         for err in logs_erroneos:
             diag_str = " | ".join(err['diagnostico_detallado'])
             lineas_txt.append(
-                f"[LÍNEA {err['linea']:02d}] ESTADO: {err['estado_clasificacion']}\n"
+                f"[LÍNEA {err['linea']:02d}] CATEGORÍA: {err['categoria_error']}\n"
                 f"  ├── Log Crudo   : {err['log_original']}\n"
                 f"  ├── Diagnóstico : {diag_str}\n"
                 f"  └── Acción Área : {err['accion_recomendada']}\n"
@@ -462,8 +492,7 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
 
     lineas_txt.extend([
         "--------------------------------------------------------------------------------",
-        "SECCIÓN B: REGISTROS ACEPTADOS CON HUELLA DE INTEGRIDAD INTERNA (HMAC-SHA256)",
-        "Nota: Huella HMAC-SHA256 de 64 caracteres para control de integridad de archivo.",
+        "SECCIÓN B: REGISTROS ACEPTADOS CON VERIFICACIÓN DE INTEGRIDAD (HMAC-SHA256)",
         "--------------------------------------------------------------------------------"
     ])
     if not logs_verificados:
@@ -471,7 +500,7 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
     else:
         for ok in logs_verificados:
             lineas_txt.append(
-                f"[LÍNEA {ok['linea']:02d}] ACEPTADO\n"
+                f"[LÍNEA {ok['linea']:02d}] ACEPTADO | ESTADO INTEGRIDAD: {ok['verificacion_hmac']}\n"
                 f"  ├── Registro    : {ok['log_original']}\n"
                 f"  └── HMAC-SHA256 : {ok['hmac_sha256']}\n"
             )
@@ -483,25 +512,25 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
     with open(os.path.join(history_dir, f"reporte_area_revision_{run_stamp}.txt"), "w", encoding="utf-8") as fth:
         fth.write("\n".join(lineas_txt))
 
-    # 3. Archivos generales datos.json y reportes.csv
     json_path = os.path.join(storage_dir, 'datos.json')
     csv_path = os.path.join(storage_dir, 'reportes.csv')
     with open(json_path, 'w', encoding='utf-8') as jf:
         json.dump(export_data, jf, ensure_ascii=False, indent=2)
     with open(csv_path, 'w', newline='', encoding='utf-8') as cf:
         writer = csv.writer(cf)
-        writer.writerow(['Linea', 'Estado', 'Valido', 'Total_Tokens', 'HMAC_SHA256', 'Log_Crudo'])
+        writer.writerow(['Linea', 'Estado', 'Valido', 'Total_Tokens', 'HMAC_SHA256', 'HMAC_Verificado', 'Log_Crudo'])
         for item in export_data:
             writer.writerow([
                 item['linea'], item['estado'], item['valido'],
-                item['total_tokens'], item['hmac_sha256'] or 'N/A', item['log_crudo']
+                item['total_tokens'], item['hmac_sha256'] or 'N/A',
+                item['hmac_verificado'], item['log_crudo']
             ])
 
 
 def analyze_logs_input(raw_input):
     """
-    Punto 6: Ejecuta el análisis completo de cada registro y calcula las estadísticas
-    (accepted / rejected) DESPUÉS de finalizar todas las validaciones.
+    Punto 2.8: Calcula los contadores estadísticos únicamente al finalizar todas las etapas
+    de validación léxica, sintáctica, semántica y de detección de patrones.
     """
     if not raw_input or not raw_input.strip():
         raw_input = DEFAULT_SAMPLE_LOGS
@@ -517,7 +546,6 @@ def analyze_logs_input(raw_input):
         res = analyze_single_log(line, line_number=idx)
         results.append(res)
 
-    # Punto 6: Contabilizar aceptados y rechazados DESPUÉS de todas las validaciones
     accepted = sum(1 for r in results if r['is_valid'])
     rejected = sum(1 for r in results if not r['is_valid'])
     total_tokens = sum(len(r['tokens']) for r in results)

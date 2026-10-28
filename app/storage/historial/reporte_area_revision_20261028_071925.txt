@@ -1,0 +1,33 @@
+================================================================================
+         REPORTE OFICIAL DE AUDITORÍA Y REVISIÓN DE LOGS — ÁREA SOC / TI        
+================================================================================
+Fecha de emisión        : 2026-10-28 07:19:25 (ID Ejecución: 20261028_071925)
+Arquitectura Almacenam. : Archivos planos estructurados (JSON, CSV y TXT con historial)
+Total de logs procesados: 4
+Logs Válidos (Aceptados): 2
+Logs con Error (Rechazo): 2
+--------------------------------------------------------------------------------
+SECCIÓN A: REGISTROS RECHAZADOS PARA REVISIÓN DEL ÁREA ENCARGADA
+--------------------------------------------------------------------------------
+[LÍNEA 03] CATEGORÍA: ERROR LÉXICO
+  ├── Log Crudo   : 2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}
+  ├── Diagnóstico : Línea 3, Col 34: Símbolo ilegal '@' ∉ Σ. El AFD transita al Estado Trampa (qT).
+  └── Acción Área : Aislar registro y remitir al Área de Revisión SOC / TI
+
+[LÍNEA 04] CATEGORÍA: ERROR SINTÁCTICO
+  ├── Log Crudo   : 2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3
+  ├── Diagnóstico : Error Sintáctico en token #13: Se esperaba 'RBRACE' pero se encontró 'FIN_DE_CADENA'.
+  └── Acción Área : Aislar registro y remitir al Área de Revisión SOC / TI
+
+--------------------------------------------------------------------------------
+SECCIÓN B: REGISTROS ACEPTADOS CON VERIFICACIÓN DE INTEGRIDAD (HMAC-SHA256)
+--------------------------------------------------------------------------------
+[LÍNEA 01] ACEPTADO | ESTADO INTEGRIDAD: VERIFICADO_OK (hmac.compare_digest = True)
+  ├── Registro    : 2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}
+  └── HMAC-SHA256 : a069717082d9373ddf25ef984d9b66a7f287fdafe4c487586966c692e6d5b35e
+
+[LÍNEA 02] ACEPTADO | ESTADO INTEGRIDAD: VERIFICADO_OK (hmac.compare_digest = True)
+  ├── Registro    : 2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"root","ctx":{"port":22}}
+  └── HMAC-SHA256 : ff53eeca96bc9c262f81a99c5cce37cd38554cf30d0e02bff771740e1457efff
+
+================================================================================

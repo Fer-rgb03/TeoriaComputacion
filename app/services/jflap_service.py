@@ -5,8 +5,9 @@ from app.utils.helpers import escape_svg_text
 
 def expand_symbol_for_jff(label, tok_type="TOKEN"):
     """
-    Expande cada etiqueta simbólica en caracteres individuales de 1 símbolo para el XML .jff
-    de JFLAP 7.1, asegurando que las transiciones hacia qT sean disjuntas de las válidas.
+    Puntos 2.2, 2.6 y 2.7:
+    Expande cada etiqueta de conjunto de caracteres en transiciones individuales de 1 carácter
+    para JFLAP 7.1, garantizando particiones disjuntas hacia el estado trampa (qT).
     """
     digits = [str(d) for d in range(10)]
     uppers = [chr(c) for c in range(ord('A'), ord('Z') + 1)]
@@ -16,28 +17,49 @@ def expand_symbol_for_jff(label, tok_type="TOKEN"):
         return ['']
     if label == '0..9':
         return digits
+    if label == '0..1':
+        return ['0', '1']
+    if label == '2..9':
+        return [str(d) for d in range(2, 10)]
+    if label == '0..3':
+        return ['0', '1', '2', '3']
+    if label == '4..9':
+        return [str(d) for d in range(4, 10)]
+    if label == '0..2':
+        return ['0', '1', '2']
+    if label == '3..9':
+        return [str(d) for d in range(3, 10)]
+    if label == '0..5':
+        return [str(d) for d in range(6)]
+    if label == '6..9':
+        return ['6', '7', '8', '9']
     if label == 'A..Z':
         return uppers
-    if label == 'Σ_str':
-        return lowers + uppers + digits + ['_', '-', '.', ':', '/', ' ', '@']
+    if label == 'Σ_base':
+        # Caracteres imprimibles dentro de STRING excepto '"' y '\'
+        return lowers + uppers + digits + ['_', '-', '.', ':', '/', ' ', '@', '(', ')', ';', "'"]
+    if label == 'Σ_esc':
+        # Caracteres de escape JSON válidos tras '\'
+        return ['"', '\\', '/', 'b', 'f', 'n', 'r', 't']
 
-    if label == '≠díg':
+    # Complementos explícitos hacia el estado trampa qT (Disjuntos para conservar determinismo en JFLAP)
+    if label == 'Σ\\díg':
         if tok_type == 'TIMESTAMP':
             return ['-', 'T', ':', '/', ' ']
         if tok_type == 'IP':
             return ['.', '-', '/', 'a', ' ']
         return ['a', 'z', '-', '_', '.', '/']
-    if label == '≠-':
+    if label == "Σ\\{'-'}":
         return digits + ['T', ':', '/', '.']
-    if label == '≠T':
+    if label == "Σ\\{'T'}":
         return digits + ['-', ':', '/', ' ']
-    if label == '≠:':
+    if label == "Σ\\{':'}":
         return digits + ['-', 'T', '/', '.']
-    if label == '≠A..Z':
+    if label == 'Σ\\A..Z':
         return ['_', '-', '0', '1', 'a', ' ']
-    if label == '≠"':
+    if label == 'Σ\\{"\\""}':
         return lowers + uppers + digits + ['_', '-', ':']
-    if label == 'Σ_err':
+    if label == 'Σ':
         if tok_type == 'TIMESTAMP':
             return digits + ['-', 'T', ':', '/']
         if tok_type == 'IP':
@@ -47,7 +69,7 @@ def expand_symbol_for_jff(label, tok_type="TOKEN"):
         if tok_type == 'EVENT_TYPE':
             return uppers + ['_', '0', '1', '-']
         if tok_type == 'STRING':
-            return lowers + uppers + digits + ['"', '_', '-']
+            return lowers + uppers + digits + ['"', '\\', '_', '-']
         if tok_type == 'NUMBER':
             return digits + ['a', 'z', '-', '.']
         return ['{', '}', ':', ',', 'a', '0']
@@ -57,9 +79,8 @@ def expand_symbol_for_jff(label, tok_type="TOKEN"):
 
 def build_formal_quintuple_from_graph(states, transitions, sigma_desc, is_afnd=False):
     """
-    Punto 2.1: Construye la quíntupla formal (Q, Σ, δ, q0, F) directamente a partir de los
-    vectores 'states' y 'transitions' del autómata, garantizando 0% de discrepancia entre
-    los estados declarados en la interfaz, la tabla de transición, el diagrama y el archivo .jff.
+    Punto 2.1: Construye la quíntupla formal (Q, Σ, δ, q0, F) directamente desde los estados y
+    transiciones declarados en el autómata para garantizar consistencia matemática total.
     """
     q_list = [s['id'] for s in states]
     initial_list = [s['id'] for s in states if s.get('initial')]
@@ -68,11 +89,7 @@ def build_formal_quintuple_from_graph(states, transitions, sigma_desc, is_afnd=F
     q0_str = initial_list[0] if initial_list else q_list[0]
     q_formatted = "{" + ", ".join(q_list) + "}"
     f_formatted = "{" + ", ".join(final_list) + "}"
-
-    if is_afnd:
-        delta_str = "δ' : Q' × (Σ ∪ {λ}) → P(Q')"
-    else:
-        delta_str = "δ : Q × Σ → Q"
+    delta_str = "δ' : Q' × (Σ ∪ {λ}) → P(Q')" if is_afnd else "δ : Q × Σ → Q"
 
     return {
         "Q": q_formatted,
@@ -85,13 +102,14 @@ def build_formal_quintuple_from_graph(states, transitions, sigma_desc, is_afnd=F
 
 def build_jff_download_uri(states, transitions, tok_type="TOKEN"):
     """
-    Punto 2.2: Genera el XML .jff nativo de JFLAP 7.1 sin omitir ningún estado ni transición.
+    Puntos 2.6 y 2.7: Exporta el archivo .jff de JFLAP 7.1 incluyendo TODOS los estados
+    declarados en la tabla (incluido qT) y todas las transiciones sin omisiones.
     """
     state_id_map = {s['id']: idx for idx, s in enumerate(states)}
 
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8" standalone="no"?>',
-        '<!-- Generado por SOC Analyzer & JFLAP Studio - Compatible con JFLAP 7.1 -->',
+        '<!-- Generado por SOC Analyzer & JFLAP Studio - Verificado para JFLAP 7.1 -->',
         '<structure>',
         '  <type>fa</type>',
         '  <automaton>'
@@ -129,10 +147,10 @@ def build_jff_download_uri(states, transitions, tok_type="TOKEN"):
     return f"data:application/xml;base64,{b64_xml}"
 
 
-def render_transition_table_html(states, transitions, is_afnd=False, tok_type="TOKEN"):
+def render_transition_table_html(states, transitions, is_afnd=False, tok_type="TOKEN", alphabet_legend=""):
     """
-    Puntos 2.1 y 2.2: Renderiza la tabla de transición formal verificando que cada fila
-    corresponda exactamente a los estados declarados en Q / Q' y todas las transiciones sean válidas.
+    Puntos 2.1, 2.2 y 2.6: Renderiza la tabla de transición formal con leyenda explícita
+    de todos los subconjuntos del alfabeto Σ utilizados en las columnas.
     """
     state_ids = {s['id'] for s in states}
     valid_transitions = [
@@ -150,9 +168,9 @@ def render_transition_table_html(states, transitions, is_afnd=False, tok_type="T
     filename = f"{tipo_str}_{tok_type}.jff"
     conjunto_str = "Q'" if is_afnd else "Q"
     titulo_tabla = (
-        f"Tabla de Transición Formal δ' — {tipo_str} (Conjunto de Estados {conjunto_str})"
+        f"Tabla de Transición Formal δ' — {tipo_str} (Estados {conjunto_str})"
         if is_afnd else
-        f"Tabla de Transición Formal δ — {tipo_str} (Conjunto de Estados {conjunto_str})"
+        f"Tabla de Transición Formal δ — {tipo_str} (Estados {conjunto_str} con qT)"
     )
 
     html_out = [
@@ -160,19 +178,29 @@ def render_transition_table_html(states, transitions, is_afnd=False, tok_type="T
         '  <div class="bg-slate-800 text-white px-3 py-2 text-xs font-bold flex flex-wrap items-center justify-between gap-2">',
         f'    <span>{escape_svg_text(titulo_tabla)}</span>',
         '    <div class="flex items-center gap-3">',
-        '      <span class="text-[11px] font-normal text-slate-300">→ Estado Inicial | * Estado Final</span>',
+        '      <span class="text-[11px] font-normal text-slate-300">→ Inicial | * Final</span>',
         f'      <a href="{jff_uri}" download="{filename}" '
         '         class="px-2.5 py-1 rounded bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-[11px] shadow transition">',
         f'        ⬇ Descargar {filename} (JFLAP 7.1)',
         '      </a>',
         '    </div>',
-        '  </div>',
+        '  </div>'
+    ]
+
+    if alphabet_legend:
+        html_out.append(
+            f'  <div class="bg-amber-50 px-3 py-1.5 border-b border-amber-200 text-[11px] font-mono text-slate-800">'
+            f'    <span class="font-bold text-amber-900">Definición Formal del Alfabeto Σ: </span>{escape_svg_text(alphabet_legend)}'
+            f'  </div>'
+        )
+
+    html_out.extend([
         '  <div class="overflow-x-auto max-h-64">',
         '    <table class="w-full text-xs text-left border-collapse">',
         '      <thead class="sticky top-0">',
         '        <tr class="bg-slate-100 border-b border-slate-300 text-slate-700">',
         f'          <th class="py-1.5 px-2.5 font-bold border-r border-slate-300">Estado ({conjunto_str})</th>'
-    ]
+    ])
 
     for sym in symbols:
         html_out.append(
@@ -234,7 +262,7 @@ def render_transition_table_html(states, transitions, is_afnd=False, tok_type="T
     ]
     html_out.append(
         '  <div class="bg-slate-50 px-3 py-2 border-t border-slate-200 text-[11px] font-mono text-slate-700">'
-        f'    <span class="font-bold text-slate-900"> Pares de Transición ({fn_name}): </span>' +
+        f'    <span class="font-bold text-slate-900">Pares de Transición ({fn_name}): </span>' +
         " &nbsp;|&nbsp; ".join(trans_items) +
         '  </div>'
     )
@@ -242,7 +270,7 @@ def render_transition_table_html(states, transitions, is_afnd=False, tok_type="T
     return '\n'.join(html_out)
 
 
-def render_jflap_svg(states, transitions, width=860, height=260, is_afnd=False, tok_type="TOKEN", node_radius=18):
+def render_jflap_svg(states, transitions, width=860, height=260, is_afnd=False, tok_type="TOKEN", node_radius=18, alphabet_legend=""):
     state_map = {s['id']: s for s in states}
     r = node_radius
 
@@ -358,14 +386,14 @@ def render_jflap_svg(states, transitions, width=860, height=260, is_afnd=False, 
             )
 
     svg.append('</svg>')
-    svg.append(render_transition_table_html(states, transitions, is_afnd=is_afnd, tok_type=tok_type))
+    svg.append(render_transition_table_html(states, transitions, is_afnd=is_afnd, tok_type=tok_type, alphabet_legend=alphabet_legend))
     return '\n'.join(svg)
 
 
 def build_jflap_models_for_token(tok_type, lexeme=""):
     """
     Construye los diagramas SVG, tablas de transición, archivos .jff y las quíntuplas formales
-    exactas (quintupla_afd y quintupla_afnd) a partir de una única definición de estados.
+    exactas (quintupla_afd y quintupla_afnd) con alfabetos completamente especificados.
     """
     if tok_type == 'TIMESTAMP':
         states_afd = []
@@ -387,28 +415,35 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
             })
         states_afd.append({'id': 'qT', 'x': 430, 'y': 225, 'trap': True, 'note': 'Estado Trampa'})
 
+        # Puntos 2.4 y 2.7: Se restringen las decenas de mes (0..1), día (0..3), hora (0..2),
+        # minuto (0..5) y segundo (0..5) en el propio AFD para que 9999-99-99T99:99:99 dé Reject en JFLAP.
         pattern_steps = [
             ('q0', 'q1', '0..9'), ('q1', 'q2', '0..9'), ('q2', 'q3', '0..9'), ('q3', 'q4', '0..9'),
             ('q4', 'q5', '-'),
-            ('q5', 'q6', '0..9'), ('q6', 'q7', '0..9'),
+            ('q5', 'q6', '0..1'), ('q6', 'q7', '0..9'),
             ('q7', 'q8', '-'),
-            ('q8', 'q9', '0..9'), ('q9', 'q10', '0..9'),
+            ('q8', 'q9', '0..3'), ('q9', 'q10', '0..9'),
             ('q10', 'q11', 'T'),
-            ('q11', 'q12', '0..9'), ('q12', 'q13', '0..9'),
+            ('q11', 'q12', '0..2'), ('q12', 'q13', '0..9'),
             ('q13', 'q14', ':'),
-            ('q14', 'q15', '0..9'), ('q15', 'q16', '0..9'),
+            ('q14', 'q15', '0..5'), ('q15', 'q16', '0..9'),
             ('q16', 'q17', ':'),
-            ('q17', 'q18', '0..9'), ('q18', 'q19', '0..9')
+            ('q17', 'q18', '0..5'), ('q18', 'q19', '0..9')
         ]
         trans_afd = [{'from': u, 'to': v, 'label': lbl} for u, v, lbl in pattern_steps] + [
-            {'from': 'q0', 'to': 'qT', 'label': '≠díg', 'curve': 18},
-            {'from': 'q4', 'to': 'qT', 'label': '≠-', 'curve': 12},
-            {'from': 'q7', 'to': 'qT', 'label': '≠-', 'curve': -12},
-            {'from': 'q10', 'to': 'qT', 'label': '≠T', 'curve': -18},
-            {'from': 'q13', 'to': 'qT', 'label': '≠:', 'curve': 12},
-            {'from': 'q16', 'to': 'qT', 'label': '≠:', 'curve': -12},
-            {'from': 'q19', 'to': 'qT', 'label': 'Σ_err', 'curve': -15},
-            {'from': 'qT', 'to': 'qT', 'label': 'Σ_err', 'curve': -1}
+            {'from': 'q0', 'to': 'qT', 'label': 'Σ\\díg', 'curve': 18},
+            {'from': 'q4', 'to': 'qT', 'label': "Σ\\{'-'}", 'curve': 12},
+            {'from': 'q5', 'to': 'qT', 'label': '2..9', 'curve': 10},
+            {'from': 'q7', 'to': 'qT', 'label': "Σ\\{'-'}", 'curve': -12},
+            {'from': 'q8', 'to': 'qT', 'label': '4..9', 'curve': -10},
+            {'from': 'q10', 'to': 'qT', 'label': "Σ\\{'T'}", 'curve': -18},
+            {'from': 'q11', 'to': 'qT', 'label': '3..9', 'curve': 10},
+            {'from': 'q13', 'to': 'qT', 'label': "Σ\\{':'}", 'curve': 12},
+            {'from': 'q14', 'to': 'qT', 'label': '6..9', 'curve': 10},
+            {'from': 'q16', 'to': 'qT', 'label': "Σ\\{':'}", 'curve': -12},
+            {'from': 'q17', 'to': 'qT', 'label': '6..9', 'curve': -10},
+            {'from': 'q19', 'to': 'qT', 'label': 'Σ', 'curve': -15},
+            {'from': 'qT', 'to': 'qT', 'label': 'Σ', 'curve': -1}
         ]
 
         states_afnd = [{'id': 'qS', 'x': 35, 'y': 140, 'initial': True, 'note': 'λ-Inicio'}] + [
@@ -419,10 +454,11 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         ]
         sigma_afd = "{0..9, '-', 'T', ':'}"
         sigma_afnd = "{0..9, '-', 'T', ':', λ}"
+        legend = "0..9 = {0,1,2,3,4,5,6,7,8,9} | 0..1 = Decena Mes | 0..3 = Decena Día | 0..2 = Decena Hora | 0..5 = Decena Min/Seg | Σ\\S = Complemento en Σ hacia qT"
         runs = [
-            (lexeme or '2026-10-26T14:30:45', 'Accept', 'Recorre q0..q19 carácter por carácter y culmina en q19 ∈ F'),
-            ('2026-09-20T14:32:05', 'Accept', 'Estructura sintáctica aceptada en q19 ∈ F (calendario validado en fase semántica)'),
-            ('2026/09/20T14:32:05', 'Reject', 'En q4 recibe "/" (≠-) y transita al estado trampa qT'),
+            (lexeme or '2026-10-26T14:30:45', 'Accept', 'Recorre q0..q19 cumpliendo rangos de decenas y culmina en q19 ∈ F'),
+            ('2026-09-20T14:32:05', 'Accept', 'Aceptada en q19 ∈ F (días por mes y bisiestos verificados en semántica)'),
+            ('9999-99-99T99:99:99', 'Reject', 'En q5 (decena de mes) recibe "9" ∈ {2..9} y transita al estado trampa qT'),
             ('2026-09-20', 'Reject', 'Finaliza en q10 ∉ F (cadena incompleta)')
         ]
         h_afd, h_afnd, rad = 265, 210, 16
@@ -469,15 +505,15 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
             {'from': 'q12', 'to': 'q13', 'label': '0..9'},
             {'from': 'q13', 'to': 'q14', 'label': '0..9'},
             {'from': 'q14', 'to': 'q15', 'label': '0..9'},
-            {'from': 'q0', 'to': 'qT', 'label': '≠díg', 'curve': 18},
+            {'from': 'q0', 'to': 'qT', 'label': 'Σ\\díg', 'curve': 18},
             {'from': 'q3', 'to': 'qT', 'label': '0..9', 'curve': 10},
-            {'from': 'q4', 'to': 'qT', 'label': '≠díg'},
+            {'from': 'q4', 'to': 'qT', 'label': 'Σ\\díg'},
             {'from': 'q7', 'to': 'qT', 'label': '0..9', 'curve': -15},
-            {'from': 'q8', 'to': 'qT', 'label': '≠díg', 'curve': 15},
+            {'from': 'q8', 'to': 'qT', 'label': 'Σ\\díg', 'curve': 15},
             {'from': 'q11', 'to': 'qT', 'label': '0..9'},
-            {'from': 'q12', 'to': 'qT', 'label': '≠díg'},
-            {'from': 'q15', 'to': 'qT', 'label': 'Σ_err', 'curve': -15},
-            {'from': 'qT', 'to': 'qT', 'label': 'Σ_err', 'curve': -1}
+            {'from': 'q12', 'to': 'qT', 'label': 'Σ\\díg'},
+            {'from': 'q15', 'to': 'qT', 'label': 'Σ', 'curve': -15},
+            {'from': 'qT', 'to': 'qT', 'label': 'Σ', 'curve': -1}
         ]
         states_afnd = [s for s in states_afd if not s.get('trap')]
         trans_afnd = [t for t in trans_afd if t['to'] != 'qT' and t['from'] != 'qT'] + [
@@ -487,11 +523,12 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         ]
         sigma_afd = "{0..9, '.'}"
         sigma_afnd = "{0..9, '.', λ}"
+        legend = "0..9 = {0,1,2,3,4,5,6,7,8,9} | '.' = Separador de octeto | Σ\\díg = Símbolo no numérico | Rango numérico 0..255 verificado en fase semántica"
         runs = [
-            (lexeme or '192.168.1.10', 'Accept', 'Avanza dígito por dígito y culmina en q14 ∈ F (rango 0..255 validado en fase semántica)'),
+            (lexeme or '192.168.1.10', 'Accept', 'Estructura de 4 octetos válida en q14 ∈ F (rango 0..255 validado en fase semántica)'),
             ('255.255.255.255', 'Accept', 'Aceptada en estado final q15 ∈ F'),
-            ('192.168.1', 'Reject', 'Dirección incompleta: finaliza en q9 ∉ F'),
-            ('192.168.1.1000', 'Reject', 'Excede 3 dígitos en cuarto octeto y transita a qT')
+            ('192.168.1', 'Reject', 'Dirección incompleta: se detiene en q9 ∉ F'),
+            ('192.168.1.1000', 'Reject', 'El 4to dígito consecutivo en q15 transita a qT')
         ]
         h_afd, h_afnd, rad = 265, 210, 16
 
@@ -521,8 +558,8 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
             {'from': 'q15', 'to': 'q16', 'label': 'I'}, {'from': 'q16', 'to': 'q17', 'label': 'T'},
             {'from': 'q17', 'to': 'q18', 'label': 'I'}, {'from': 'q18', 'to': 'q19', 'label': 'C'},
             {'from': 'q19', 'to': 'q20', 'label': 'A'}, {'from': 'q20', 'to': 'q21', 'label': 'L'},
-            {'from': 'q21', 'to': 'qT', 'label': 'Σ_err'},
-            {'from': 'qT', 'to': 'qT', 'label': 'Σ_err', 'curve': -1}
+            {'from': 'q21', 'to': 'qT', 'label': 'Σ'},
+            {'from': 'qT', 'to': 'qT', 'label': 'Σ', 'curve': -1}
         ]
         states_afnd = [{'id': 'qS', 'x': 25, 'y': 195, 'initial': True, 'note': 'λ-Inicio'}] + [
             dict(s, initial=False) for s in states_afd if not s.get('trap')
@@ -530,8 +567,9 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         trans_afnd = [{'from': 'qS', 'to': 'q0', 'label': 'λ'}] + [
             t for t in trans_afd if t['to'] != 'qT' and t['from'] != 'qT'
         ]
-        sigma_afd = "{A..Z}"
-        sigma_afnd = "{A..Z, λ}"
+        sigma_afd = "{A, C, E, F, G, I, L, N, O, R, T, W}"
+        sigma_afnd = "{A, C, E, F, G, I, L, N, O, R, T, W, λ}"
+        legend = "Alfabeto Σ = Letras mayúsculas de las palabras reservadas {INFO, WARNING, ERROR, CRITICAL} | λ = Transición vacía"
         runs = [
             (lexeme or 'ERROR', 'Accept', 'Recorre E -> R -> R -> O -> R hasta q21 ∈ F'),
             ('CRITICAL', 'Accept', 'Recorre C -> R -> I -> T -> I -> C -> A -> L hasta q21 ∈ F'),
@@ -552,9 +590,9 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
             {'from': 'q1', 'to': 'q1', 'label': 'A..Z', 'curve': 1},
             {'from': 'q1', 'to': 'q2', 'label': '_', 'curve': 26},
             {'from': 'q2', 'to': 'q1', 'label': 'A..Z', 'curve': 26},
-            {'from': 'q0', 'to': 'qT', 'label': '≠A..Z', 'curve': 15},
-            {'from': 'q2', 'to': 'qT', 'label': '≠A..Z', 'curve': -15},
-            {'from': 'qT', 'to': 'qT', 'label': 'Σ_err', 'curve': -1}
+            {'from': 'q0', 'to': 'qT', 'label': 'Σ\\A..Z', 'curve': 15},
+            {'from': 'q2', 'to': 'qT', 'label': 'Σ\\A..Z', 'curve': -15},
+            {'from': 'qT', 'to': 'qT', 'label': 'Σ', 'curve': -1}
         ]
         states_afnd = [
             {'id': 'q0', 'x': 120, 'y': 110, 'initial': True, 'note': 'Inicio'},
@@ -571,50 +609,59 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         ]
         sigma_afd = "{A..Z, '_'}"
         sigma_afnd = "{A..Z, '_', λ}"
+        legend = "A..Z = {A,B,C,...,Z} | '_' = Guion bajo separador | Σ\\A..Z = Símbolo distinto de letra mayúscula"
         runs = [
             (lexeme or 'LOGIN_FAILED', 'Accept', 'Culmina en estado de aceptación q1 ∈ F'),
             ('PRIVILEGE_ESCALATION', 'Accept', 'Cumple patrón [A-Z]+(_[A-Z]+)* en q1 ∈ F'),
-            ('_LOGIN', 'Reject', 'Inicia con "_" (≠A..Z) y transita a qT'),
+            ('_LOGIN', 'Reject', 'Inicia con "_" (Σ\\A..Z) y transita a qT'),
             ('LOGIN__', 'Reject', 'Doble guion bajo en q2 transita a qT')
         ]
         h_afd, h_afnd, rad = 245, 210, 18
 
     elif tok_type == 'STRING':
+        # Punto 2.5: Incluye el estado q2 de Secuencia de Escape (\) para soportar \" y \\ en JSON
         states_afd = [
-            {'id': 'q0', 'x': 120, 'y': 85, 'initial': True, 'note': 'Inicio'},
-            {'id': 'q1', 'x': 380, 'y': 85, 'note': 'Interior " "'},
-            {'id': 'q2', 'x': 640, 'y': 85, 'final': True, 'note': 'Cierre "'},
-            {'id': 'qT', 'x': 380, 'y': 195, 'trap': True, 'note': 'Estado Trampa'}
+            {'id': 'q0', 'x': 95, 'y': 85, 'initial': True, 'note': 'Inicio'},
+            {'id': 'q1', 'x': 310, 'y': 85, 'note': 'Cuerpo Cadena'},
+            {'id': 'q2', 'x': 525, 'y': 40, 'note': 'Escape \\'},
+            {'id': 'q3', 'x': 735, 'y': 85, 'final': True, 'note': 'Cierre "'},
+            {'id': 'qT', 'x': 310, 'y': 195, 'trap': True, 'note': 'Estado Trampa'}
         ]
         trans_afd = [
             {'from': 'q0', 'to': 'q1', 'label': '"'},
-            {'from': 'q1', 'to': 'q1', 'label': 'Σ_str', 'curve': 1},
-            {'from': 'q1', 'to': 'q2', 'label': '"'},
-            {'from': 'q0', 'to': 'qT', 'label': '≠"', 'curve': 15},
-            {'from': 'q2', 'to': 'qT', 'label': 'Σ_err', 'curve': -15},
-            {'from': 'qT', 'to': 'qT', 'label': 'Σ_err', 'curve': -1}
+            {'from': 'q1', 'to': 'q1', 'label': 'Σ_base', 'curve': 1},
+            {'from': 'q1', 'to': 'q2', 'label': '\\', 'curve': 18},
+            {'from': 'q2', 'to': 'q1', 'label': 'Σ_esc', 'curve': 18},
+            {'from': 'q1', 'to': 'q3', 'label': '"'},
+            {'from': 'q0', 'to': 'qT', 'label': 'Σ\\{"\\""}', 'curve': 15},
+            {'from': 'q3', 'to': 'qT', 'label': 'Σ', 'curve': -15},
+            {'from': 'qT', 'to': 'qT', 'label': 'Σ', 'curve': -1}
         ]
         states_afnd = [
-            {'id': 'q0', 'x': 110, 'y': 110, 'initial': True, 'note': 'Inicio'},
-            {'id': 'q1', 'x': 300, 'y': 110, 'note': 'Abre "'},
-            {'id': 'q2', 'x': 510, 'y': 110, 'note': 'Cuerpo'},
-            {'id': 'q3', 'x': 720, 'y': 110, 'final': True, 'note': 'Cierra "'}
+            {'id': 'q0', 'x': 90, 'y': 110, 'initial': True, 'note': 'Inicio'},
+            {'id': 'q1', 'x': 250, 'y': 110, 'note': 'Abre "'},
+            {'id': 'q2', 'x': 430, 'y': 110, 'note': 'Cuerpo'},
+            {'id': 'q3', 'x': 580, 'y': 45, 'note': 'Escape \\'},
+            {'id': 'q4', 'x': 740, 'y': 110, 'final': True, 'note': 'Cierra "'}
         ]
         trans_afnd = [
             {'from': 'q0', 'to': 'q1', 'label': '"'},
             {'from': 'q1', 'to': 'q2', 'label': 'λ'},
-            {'from': 'q2', 'to': 'q2', 'label': 'Σ_str', 'curve': 1},
-            {'from': 'q2', 'to': 'q3', 'label': '"'}
+            {'from': 'q2', 'to': 'q2', 'label': 'Σ_base', 'curve': 1},
+            {'from': 'q2', 'to': 'q3', 'label': '\\', 'curve': 18},
+            {'from': 'q3', 'to': 'q2', 'label': 'Σ_esc', 'curve': 18},
+            {'from': 'q2', 'to': 'q4', 'label': '"'}
         ]
-        sigma_afd = '{"\"" , Σ_str}'
-        sigma_afnd = '{"\"" , Σ_str, λ}'
+        sigma_afd = '{"\\"", "\\\\", Σ_base, Σ_esc}'
+        sigma_afnd = '{"\\"", "\\\\", Σ_base, Σ_esc, λ}'
+        legend = 'Σ_base = Caracteres imprimibles excepto ( " ) y ( \\ ) | Σ_esc = {"\\"", "\\\\", "/", "b", "f", "n", "r", "t"} (Secuencias de escape JSON)'
         runs = [
-            (lexeme or '"admin"', 'Accept', 'Abre con ", lee caracteres válidos y cierra con " (q2 ∈ F en AFD / q3 ∈ F\' en AFND)'),
-            ('""', 'Accept', 'Cadena vacía entre comillas aceptada'),
-            ('"admin', 'Reject', 'Sin comilla final no alcanza el estado de aceptación'),
+            (lexeme or '"admin"', 'Accept', 'Abre con ", consume Σ_base en q1 y cierra con " en q3 ∈ F'),
+            ('"usr\\"admin\\""', 'Accept', 'Procesa comillas escapadas \\" transitando q1 -> q2 -> q1 y acepta en q3 ∈ F'),
+            ('"admin', 'Reject', 'Sin comilla final permanece en q1 ∉ F'),
             ('admin"', 'Reject', 'No inicia con comilla y cae en qT')
         ]
-        h_afd, h_afnd, rad = 245, 210, 18
+        h_afd, h_afnd, rad = 245, 210, 17
 
     elif tok_type == 'NUMBER':
         states_afd = [
@@ -625,9 +672,9 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         trans_afd = [
             {'from': 'q0', 'to': 'q1', 'label': '0..9'},
             {'from': 'q1', 'to': 'q1', 'label': '0..9', 'curve': 1},
-            {'from': 'q0', 'to': 'qT', 'label': '≠díg', 'curve': -35},
-            {'from': 'q1', 'to': 'qT', 'label': '≠díg'},
-            {'from': 'qT', 'to': 'qT', 'label': 'Σ_err', 'curve': 1}
+            {'from': 'q0', 'to': 'qT', 'label': 'Σ\\díg', 'curve': -35},
+            {'from': 'q1', 'to': 'qT', 'label': 'Σ\\díg'},
+            {'from': 'qT', 'to': 'qT', 'label': 'Σ', 'curve': 1}
         ]
         states_afnd = [
             {'id': 'q0', 'x': 160, 'y': 110, 'initial': True, 'note': 'Inicio'},
@@ -641,6 +688,7 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         ]
         sigma_afd = "{0..9}"
         sigma_afnd = "{0..9, λ}"
+        legend = "0..9 = {0,1,2,3,4,5,6,7,8,9} | Σ\\díg = Cualquier carácter no numérico | λ = Transición vacía"
         runs = [
             (lexeme or '3', 'Accept', 'Dígito numérico válido (q1 ∈ F en AFD / q2 ∈ F\' en AFND)'),
             ('2026', 'Accept', 'Secuencia continua de dígitos aceptada'),
@@ -657,8 +705,8 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         ]
         trans_afd = [
             {'from': 'q0', 'to': 'q1', 'label': sym},
-            {'from': 'q1', 'to': 'qT', 'label': 'Σ_err'},
-            {'from': 'qT', 'to': 'qT', 'label': 'Σ_err', 'curve': 1}
+            {'from': 'q1', 'to': 'qT', 'label': 'Σ'},
+            {'from': 'qT', 'to': 'qT', 'label': 'Σ', 'curve': 1}
         ]
         states_afnd = [
             {'id': 'q0', 'x': 160, 'y': 110, 'initial': True, 'note': 'Inicio'},
@@ -671,6 +719,7 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
         ]
         sigma_afd = f"{{'{sym}'}}"
         sigma_afnd = f"{{'{sym}', λ}}"
+        legend = f"Símbolo terminal único Σ = {{'{sym}'}} | Cualquier carácter adicional en q1 transita al estado trampa qT"
         runs = [
             (sym, 'Accept', f'Reconoce el delimitador {sym!r} (q1 ∈ F en AFD / q2 ∈ F\' en AFND)'),
             (sym + sym, 'Reject', 'Un segundo carácter transita a qT')
@@ -681,8 +730,8 @@ def build_jflap_models_for_token(tok_type, lexeme=""):
     quintupla_afnd = build_formal_quintuple_from_graph(states_afnd, trans_afnd, sigma_afnd, is_afnd=True)
 
     return (
-        render_jflap_svg(states_afd, trans_afd, height=h_afd, is_afnd=False, tok_type=tok_type, node_radius=rad),
-        render_jflap_svg(states_afnd, trans_afnd, height=h_afnd, is_afnd=True, tok_type=tok_type, node_radius=rad),
+        render_jflap_svg(states_afd, trans_afd, height=h_afd, is_afnd=False, tok_type=tok_type, node_radius=rad, alphabet_legend=legend),
+        render_jflap_svg(states_afnd, trans_afnd, height=h_afnd, is_afnd=True, tok_type=tok_type, node_radius=rad, alphabet_legend=legend),
         runs,
         quintupla_afd,
         quintupla_afnd

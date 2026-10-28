@@ -1,18 +1,18 @@
 {
     "metadata": {
-        "sistema": "SOC Analyzer & JFLAP Studio (Persistencia en Archivos JSON/CSV/TXT)",
-        "fecha_generacion": "2026-10-26 19:32:13",
-        "id_ejecucion": "20261026_193213",
+        "sistema": "SOC Analyzer & JFLAP Studio (Almacenamiento basado en archivos JSON/CSV/TXT)",
+        "fecha_generacion": "2026-10-28 07:19:25",
+        "id_ejecucion": "20261028_071925",
         "total_procesados": 4,
         "total_aceptados": 2,
         "total_rechazados": 2,
-        "nota_seguridad": "Validación léxica, sintáctica, semántica y filtrado heurístico de entradas. Para futuras integraciones con BD relacionales se requiere uso de consultas parametrizadas."
+        "alcance_deteccion": "Detección basada en patrones léxicos/semánticos acotados. No sustituye controles de motor de BD como consultas parametrizadas o WAF."
     },
     "logs_erroneos": [
         {
             "linea": 3,
             "log_original": "2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {\"user\":\"admin\"}",
-            "estado_clasificacion": "ERROR LÉXICO",
+            "categoria_error": "ERROR LÉXICO",
             "diagnostico_detallado": [
                 "Línea 3, Col 34: Símbolo ilegal '@' ∉ Σ. El AFD transita al Estado Trampa (qT)."
             ],
@@ -21,7 +21,7 @@
         {
             "linea": 4,
             "log_original": "2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {\"user\":\"admin\",\"attempts\":3",
-            "estado_clasificacion": "ERROR SINTÁCTICO",
+            "categoria_error": "ERROR SINTÁCTICO",
             "diagnostico_detallado": [
                 "Error Sintáctico en token #13: Se esperaba 'RBRACE' pero se encontró 'FIN_DE_CADENA'."
             ],
