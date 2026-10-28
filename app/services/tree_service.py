@@ -1,6 +1,9 @@
 import re
 import calendar
 from app.utils.helpers import escape_svg_text
+from app.patterns.singleton.grammar_singleton import GrammarSingleton
+
+grammar_ref = GrammarSingleton()
 
 SUSPICIOUS_TREE_PATTERNS = re.compile(
     r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|TRUNCATE)\b|--|;|\bOR\b\s+['\"\d]+=['\"\d]+|"
@@ -136,34 +139,38 @@ def render_real_tree_svg(root, tree_kind="syntactic"):
 
 def build_token_real_trees(tok_type, val):
     """
-    Puntos 2.3, 2.4 y 2.9: Construye el Árbol Sintáctico y el Árbol Semántico de cada token
-    aplicando exactamente las mismas reglas de calendario (incluyendo años bisiestos),
-    octetos IPv4 (0..255 sin ceros iniciales ambiguos) y seguridad de cadenas.
+    M-12, B-13 y B-14:
+    Construye el Árbol Sintáctico y Semántico con formato :02d en minutos/segundos (32:05),
+    validación real contra catálogo taxonómico de EVENT_TYPE y rango entero unificado [0..10^9].
     """
     if tok_type == 'TIMESTAMP':
-        y_str, m_str, d_str = val[0:4], val[5:7], val[8:10]
-        hh_str, mm_str, ss_str = val[11:13], val[14:16], val[17:19]
+        core = val[:19]
+        extra_tz = val[19:]
+        y_str, m_str, d_str = core[0:4], core[5:7], core[8:10]
+        hh_str, mm_str, ss_str = core[11:13], core[14:16], core[17:19]
 
         y_int, m_int, d_int = int(y_str), int(m_str), int(d_str)
         hh_int, mm_int, ss_int = int(hh_str), int(mm_str), int(ss_str)
 
         errors_ts = []
+        if extra_tz:
+            errors_ts.append(f"Zona horaria o fracción '{extra_tz}' fuera del alcance UTC local sin sufijo")
         if not (1970 <= y_int <= 2100):
             errors_ts.append(f"Año fuera de rango ({y_int})")
         if not (1 <= m_int <= 12):
-            errors_ts.append(f"Mes inválido ({m_int}; rango 01..12)")
+            errors_ts.append(f"Mes inválido ({m_int:02d}; rango 01..12)")
             max_day = 31
         else:
             max_day = calendar.monthrange(y_int, m_int)[1]
             if not (1 <= d_int <= max_day):
                 bisiesto_str = "bisiesto" if calendar.isleap(y_int) else "no bisiesto"
-                errors_ts.append(f"Día inválido ({d_int}) para mes {m_int:02d}/{y_int} ({bisiesto_str}, máx {max_day})")
+                errors_ts.append(f"Día inválido ({d_int:02d}) para mes {m_int:02d}/{y_int} ({bisiesto_str}, máx {max_day})")
         if not (0 <= hh_int <= 23):
-            errors_ts.append(f"Hora inválida ({hh_int}; rango 00..23)")
+            errors_ts.append(f"Hora inválida ({hh_int:02d}; rango 00..23)")
         if not (0 <= mm_int <= 59):
-            errors_ts.append(f"Minuto inválido ({mm_int}; rango 00..59)")
+            errors_ts.append(f"Minuto inválido ({mm_int:02d}; rango 00..59)")
         if not (0 <= ss_int <= 59):
-            errors_ts.append(f"Segundo inválido ({ss_int}; rango 00..59)")
+            errors_ts.append(f"Segundo inválido ({ss_int:02d}; rango 00..59)")
 
         sem_ok = len(errors_ts) == 0
         sem_msg = "Fecha/hora ISO-8601 válida en calendario" if sem_ok else " | ".join(errors_ts)
@@ -188,17 +195,18 @@ def build_token_real_trees(tok_type, val):
                 ]}
             ]
         }
+        # B-13: Formato :02d para mostrar 32:05 en lugar de 32:5
         sem_tree = {
             'label': 'TIMESTAMP.sem',
             'sub': 'Calendario OK' if sem_ok else 'ERROR CALENDARIO',
             'children': [
                 {'label': 'Fecha', 'sub': f"{y_str}-{m_str}-{d_str}", 'children': [
-                    {'label': 'Mes (1..12)', 'sub': f"{m_int} ({'OK' if 1<=m_int<=12 else 'ERR'})"},
-                    {'label': f'Día (1..{max_day})', 'sub': f"{d_int} ({'OK' if 1<=m_int<=12 and 1<=d_int<=max_day else 'ERR'})"}
+                    {'label': 'Mes (01..12)', 'sub': f"{m_int:02d} ({'OK' if 1<=m_int<=12 else 'ERR'})"},
+                    {'label': f'Día (01..{max_day:02d})', 'sub': f"{d_int:02d} ({'OK' if 1<=m_int<=12 and 1<=d_int<=max_day else 'ERR'})"}
                 ]},
                 {'label': 'Reloj 24h', 'sub': f"{hh_str}:{mm_str}:{ss_str}", 'children': [
-                    {'label': 'HH (0..23)', 'sub': f"{hh_int} ({'OK' if 0<=hh_int<=23 else 'ERR'})"},
-                    {'label': 'MI:SS (0..59)', 'sub': f"{mm_int}:{ss_int} ({'OK' if 0<=mm_int<=59 and 0<=ss_int<=59 else 'ERR'})"}
+                    {'label': 'HH (00..23)', 'sub': f"{hh_int:02d} ({'OK' if 0<=hh_int<=23 else 'ERR'})"},
+                    {'label': 'MI:SS (00..59)', 'sub': f"{mm_int:02d}:{ss_int:02d} ({'OK' if 0<=mm_int<=59 and 0<=ss_int<=59 else 'ERR'})"}
                 ]}
             ]
         }
@@ -210,7 +218,7 @@ def build_token_real_trees(tok_type, val):
 
         for idx, p in enumerate(parts, start=1):
             if len(p) > 1 and p.startswith('0'):
-                oct_errors.append(f"Octeto #{idx} ({p}) con cero inicial no permitido")
+                oct_errors.append(f"Octeto #{idx} ({p}) con cero inicial prohibido")
                 oct_ok = False
             else:
                 v_int = int(p)
@@ -265,19 +273,26 @@ def build_token_real_trees(tok_type, val):
         }
 
     elif tok_type == 'EVENT_TYPE':
+        # B-14: Consulta real al catálogo taxonómico del SOC (rechaza FOO_BAR semánticamente)
         parts = val.split('_')
-        sem_ok = True
-        sem_msg = "Taxonomía de evento SOC registrada"
+        catalog_desc = grammar_ref.VALID_SOC_EVENTS.get(val)
+        if catalog_desc:
+            sem_ok = True
+            sem_msg = f"Catálogo SOC: {catalog_desc}"
+        else:
+            sem_ok = False
+            sem_msg = f"Evento {val!r} no registrado en el catálogo taxonómico SOC (SBS 504-2021)"
+
         syn_tree = {
             'label': 'EVENT_TYPE',
             'children': [{'label': f'PALABRA_{i+1}', 'sub': p} for i, p in enumerate(parts)]
         }
         sem_tree = {
             'label': 'EVENT_TYPE.sem',
-            'sub': 'Categoría SOC',
+            'sub': 'CATÁLOGO OK' if sem_ok else 'NO REGISTRADO',
             'children': [
                 {'label': 'Identificador', 'sub': val},
-                {'label': 'Normativa', 'sub': 'SBS 504-2021'}
+                {'label': 'Taxonomía SBS', 'sub': 'Registrado' if sem_ok else 'No Existe'}
             ]
         }
 
@@ -291,10 +306,10 @@ def build_token_real_trees(tok_type, val):
             sem_msg = "Contiene caracteres de control ASCII no permitidos"
         elif match_susp:
             sem_ok = False
-            sem_msg = f"Entrada sospechosa detectada ({match_susp.group(0)!r}): posible vector de inyección"
+            sem_msg = f"Entrada sospechosa detectada ({match_susp.group(0)!r})"
         else:
             sem_ok = True
-            sem_msg = f"Cadena verificada (long={len(inner)})"
+            sem_msg = f"Literal verificado (long={len(inner)})"
 
         syn_tree = {
             'label': 'STRING',
@@ -306,24 +321,31 @@ def build_token_real_trees(tok_type, val):
         }
         sem_tree = {
             'label': 'STRING.sem',
-            'sub': 'Cadena Segura' if sem_ok else 'ALERTA SEGURIDAD',
+            'sub': 'Literal Aceptado' if sem_ok else 'PATRÓN SOSPECHOSO',
             'children': [
                 {'label': 'Valor', 'sub': inner[:24] + ('...' if len(inner) > 24 else '') or 'vacío'},
-                {'label': 'Inspección', 'sub': 'Limpio' if sem_ok else 'Patrón Sospechoso'}
+                {'label': 'Filtro Patrones', 'sub': 'Sin alertas' if sem_ok else f'Alerta: {match_susp.group(0) if match_susp else "Ctrl"}'}
             ]
         }
 
     elif tok_type == 'NUMBER':
-        num_val = int(val)
-        sem_ok = (0 <= num_val <= 10**9)
-        sem_msg = f"Entero válido ({num_val})" if sem_ok else f"Entero fuera de rango ({num_val})"
-        syn_tree = {'label': 'NUMBER', 'children': [{'label': 'DIGITOS', 'sub': val}]}
+        # M-12: Criterio único entero sin signo en rango [0..10^9]
+        if len(val) > 1 and val.startswith('0'):
+            sem_ok = False
+            sem_msg = f"Cero a la izquierda prohibido en JSON ({val})"
+            num_val = val
+        else:
+            num_val = int(val)
+            sem_ok = (0 <= num_val <= 10**9)
+            sem_msg = f"Entero válido en rango [0..10^9] ({num_val})" if sem_ok else f"Entero fuera de rango [0..10^9] ({num_val})"
+
+        syn_tree = {'label': 'NUMBER', 'children': [{'label': 'ENTERO_JSON', 'sub': val}]}
         sem_tree = {
             'label': 'NUMBER.sem',
-            'sub': 'int64',
+            'sub': 'Entero [0..10^9]' if sem_ok else 'FUERA DE RANGO',
             'children': [
-                {'label': 'Valor Numérico', 'sub': str(num_val)},
-                {'label': 'Rango', 'sub': '0..10^9 OK' if sem_ok else 'Fuera de rango'}
+                {'label': 'Valor', 'sub': str(num_val)},
+                {'label': 'Dominio', 'sub': '0..10^9 OK' if sem_ok else 'Excede 10^9'}
             ]
         }
 

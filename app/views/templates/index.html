@@ -8,10 +8,10 @@
     <script>
         function loadSample(type) {
             const samples = {
-                'valido': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}\n2026-10-12T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"root","ctx":{"port":22}}',
-                'lexico': '2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}',
+                'valido': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}\n2028-02-29T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"café","ctx":{"port":22}}',
+                'lexico': '2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}\n2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":007}',
                 'sintactico': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3',
-                'semantico': '2026-02-30T14:32:05 999.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}',
+                'semantico': '2026-02-29T14:32:05 256.1.1.1 ERROR FOO_BAR {"user":"admin","attempts":3}\n2026-04-31T14:32:05 010.001.001.001 WARNING LOGIN_FAILED {"user":"admin"}',
                 'seguridad': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin\'); DROP TABLE logs;--","attempts":3}'
             };
             document.getElementById('log_input').value = samples[type];
@@ -28,11 +28,19 @@
             activeBtn.classList.add('border-emerald-500', 'text-emerald-400', 'bg-slate-800/90');
             activeBtn.classList.remove('border-transparent', 'text-slate-400');
         }
+
+        function jumpToAutomaton(tokType) {
+            switchMainTab('tab-catalogo-jflap');
+            const detailEl = document.getElementById('cat-' + tokType);
+            if (detailEl) {
+                detailEl.open = true;
+                detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
     </script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
 
-    <!-- ENCABEZADO PRINCIPAL -->
     <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-4 flex flex-wrap justify-between items-center gap-4">
             <div class="flex items-center gap-3">
@@ -43,8 +51,8 @@
                 </div>
             </div>
             <div class="flex gap-2 text-xs">
-                <span class="px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600 text-amber-200 font-semibold">Exportación Nativa .JFF (JFLAP 7.1)</span>
-                <span class="px-3 py-1 rounded-full bg-sky-950/80 border border-sky-600 text-sky-200 font-semibold">Persistencia en Archivos JSON / CSV / TXT</span>
+                <span class="px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600 text-amber-200 font-semibold">AFD = ER Exacto &amp; Thompson AFND (.JFF)</span>
+                <span class="px-3 py-1 rounded-full bg-sky-950/80 border border-sky-600 text-sky-200 font-semibold">Reportes Aislados por Sesión</span>
             </div>
         </div>
     </header>
@@ -57,72 +65,79 @@
         </div>
         {% endif %}
 
-        <!-- BLOQUE EJECUTIVO DOCUMENTADO CON PRECISIÓN TÉCNICA -->
+        <!-- BLOQUE EJECUTIVO Y DECLARACIÓN FORMAL DEL SUBCONJUNTO DE LENGUAJE (H-03, H-05, B-13, B-15) -->
         <section class="rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-200 pb-4">
             <div>
               <span class="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 uppercase tracking-wide">
-                Validación Formal de Logs &amp; Persistencia Auditada en Archivos
+                Especificación Formal del Lenguaje &amp; Alcance del Prototipo Académico
               </span>
               <h2 class="mt-2 text-lg font-bold text-slate-900">
-                Descripción Funcional, Alcance de Seguridad y Arquitectura de Almacenamiento
+                Arquitectura de Validación en 4 Fases, Gramática JSON Simplificada y Seguridad de Sesión
               </h2>
             </div>
 
+            <!-- H-03: Botones de descarga visibles únicamente después de ejecutar un análisis en la sesión activa -->
+            {% if has_analyzed %}
             <div class="flex flex-wrap gap-2">
               <a href="/descargar/errores-json"
                  class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 transition">
-                <span>📥 Descargar Logs Rechazados (.JSON)</span>
+                <span>📥 Descargar Logs Rechazados de esta Sesión (.JSON)</span>
               </a>
               <a href="/descargar/reporte-txt"
                  class="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow hover:bg-slate-900 transition">
                 <span>📄 Descargar Reporte Área Revisión (.TXT)</span>
               </a>
             </div>
+            {% else %}
+            <div class="rounded-lg bg-slate-100 px-3 py-2 text-[11px] text-slate-600 border border-slate-300">
+              🔒 Presione <strong>"Analizar Logs"</strong> para generar y habilitar la descarga aislada de reportes de su sesión.
+            </div>
+            {% endif %}
           </div>
 
           <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-700 leading-relaxed">
             <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
-              <h3 class="font-bold text-slate-900 mb-1">1. ¿Qué hace el programa y cómo opera?</h3>
+              <h3 class="font-bold text-slate-900 mb-1">1. Equivalencia ER ↔ AFND ↔ AFD</h3>
               <p>
-                Analiza registros de eventos de un SOC mediante cuatro fases secuenciales: <strong>(1) Análisis Léxico</strong> con Expresiones Regulares y Autómatas Finitos (AFD con estado trampa <code>qT</code> y AFND exportables a <code>.jff</code> para JFLAP 7.1), <strong>(2) Análisis Sintáctico</strong> con Gramática Libre de Contexto y Autómata de Pila (PDA), <strong>(3) Validación Semántica</strong> de rangos IPv4 (<code>0..255</code>) y calendario real, y <strong>(4) Filtrado de entradas sospechosas</strong>.
+                Cada categoría léxica se define sobre el alfabeto global <code>Σ_ASCII</code> (usando <code>∖</code> para diferencia de conjuntos y <code>q_ini = q0</code>). El AFD de <code>TIMESTAMP</code> bifurca decenas de mes (<code>01..12</code>), día (<code>01..31</code>) y hora (<code>00..23</code>) en coincidencia exacta con su ER, delegando años bisiestos y días por mes (30/31) a la fase semántica.
               </p>
             </div>
 
             <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
-              <h3 class="font-bold text-slate-900 mb-1">2. Arquitectura de Archivos e Historial</h3>
+              <h3 class="font-bold text-slate-900 mb-1">2. Subconjunto "JSON Simplificado SOC"</h3>
               <p>
-                El sistema prescinde de un motor de base de datos relacional y persiste los resultados en archivos planos estructurados (<code>datos.json</code>, <code>reportes.csv</code>, <code>logs_erroneos.json</code> y <code>reporte_area_revision.txt</code>), conservando copias con marca de tiempo en <code>app/storage/historial/</code> para evitar el sobrescrito accidental entre ejecuciones.
+                La GLC modela objetos clave-valor planos o anidados con terminales <code>LBRACE</code>, <code>RBRACE</code>, <code>COLON</code>, <code>COMMA</code>, <code>STRING</code> (con escapes <code>\" \\ \/ \b \f \n \r \t</code>) y <code>NUMBER</code> restringido a enteros sin signo <code>0|[1-9][0-9]*</code> en rango <code>[0..10^9]</code> (rechaza ceros iniciales como <code>007</code>). Quedan fuera del alcance arrays <code>[]</code>, booleanos, <code>null</code>, flotantes, IPv6 y husos horarios (<code>Z/+00:00</code>).
               </p>
             </div>
 
             <div class="rounded-lg bg-emerald-50/70 p-3.5 border border-emerald-300">
-              <h3 class="font-bold text-emerald-950 mb-1">3. Alcance de Seguridad e Integridad</h3>
+              <h3 class="font-bold text-emerald-950 mb-1">3. Aislamiento de Sesión y Clave HMAC</h3>
               <p class="text-emerald-900">
-                Aplica límites de longitud, validación por tipo de dato, rechazo de caracteres de control y detección heurística de secuencias sospechosas (SQLi/NoSQLi/XSS). Los registros aceptados reciben un código <strong>HMAC-SHA256 completo (64 caracteres)</strong> para control de integridad de archivo. Si en el futuro se integra una base de datos relacional, deberán emplearse consultas parametrizadas (<em>Prepared Statements</em>) y controles de acceso.
+                Los archivos exportados se aíslan mediante un identificador único de sesión para evitar la sobrescritura accidental y el acceso cruzado entre usuarios. Los registros aceptados incluyen una huella <strong>HMAC-SHA256 de 64 caracteres</strong> cuya clave secreta se administra vía variable de entorno del servidor (<code>SOC_HMAC_SECRET_KEY</code>).
               </p>
             </div>
           </div>
         </section>
 
-        <!-- CONSOLA DE ENTRADA Y SUBIDA DE ARCHIVO TXT -->
+        <!-- CONSOLA DE ENTRADA -->
         <section class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
             <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                 <div>
-                    <h2 class="text-base font-semibold text-white">1. Entrada de Logs de Seguridad del SOC (Texto o Archivo .txt / .log máx. 1 MB)</h2>
-                    <p class="text-xs text-slate-400">Estructura del lenguaje formal: <code class="text-emerald-400">TIMESTAMP IP SEVERITY EVENT_TYPE PAYLOAD</code></p>
+                    <h2 class="text-base font-semibold text-white">1. Consola de Entrada de Eventos SOC (Texto o Archivo .txt / .log máx. 1 MB)</h2>
+                    <p class="text-xs text-slate-400">Gramática formal: <code class="text-emerald-400">LOG → TIMESTAMP IP SEVERITY EVENT_TYPE PAYLOAD</code></p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" onclick="loadSample('valido')" class="text-xs px-3 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 transition">Ejemplo Válido + Anidado</button>
-                    <button type="button" onclick="loadSample('lexico')" class="text-xs px-3 py-1.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700 transition">Error Léxico (@)</button>
-                    <button type="button" onclick="loadSample('sintactico')" class="text-xs px-3 py-1.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 transition">Error Sintáctico (Falta })</button>
-                    <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Error Semántico (30 Feb / IP 999)</button>
-                    <button type="button" onclick="loadSample('seguridad')" class="text-xs px-3 py-1.5 rounded bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 transition">Entrada Sospechosa (Inyección)</button>
+                    <button type="button" onclick="loadSample('valido')" class="text-xs px-3 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 transition">Válidos (Bisiesto 2028 + Acentos)</button>
+                    <button type="button" onclick="loadSample('lexico')" class="text-xs px-3 py-1.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700 transition">Error Léxico (@ y 007)</button>
+                    <button type="button" onclick="loadSample('sintactico')" class="text-xs px-3 py-1.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 transition">Error Sintáctico (Falta , o })</button>
+                    <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Error Semántico (2026-02-29 / FOO_BAR / IP 010)</button>
+                    <button type="button" onclick="loadSample('seguridad')" class="text-xs px-3 py-1.5 rounded bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 transition">Alerta Patrón Sospechoso</button>
                 </div>
             </div>
 
             <form method="POST" enctype="multipart/form-data" class="space-y-4">
-                <textarea id="log_input" name="log_input" rows="3"
+                <textarea id="log_input" name="log_input" rows="4"
                     class="w-full bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-sm text-emerald-300 focus:outline-none focus:border-emerald-500"
                     placeholder="Pega tus logs aquí...">{{ log_input }}</textarea>
 
@@ -134,21 +149,23 @@
                     </div>
                     <button type="submit"
                         class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg transition">
-                        Analizar y Generar Gráficos JFLAP (.JFF) + Árboles
+                        Analizar Logs y Generar Reportes de Sesión
                     </button>
                 </div>
             </form>
         </section>
 
-        <!-- TARJETAS DE RESUMEN COHERENTES CON EL RESULTADO FINAL -->
+        <!-- TARJETAS DE RESUMEN (M-09: Distinción clara de tokens válidos vs totales inspeccionados) -->
         <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <p class="text-xs text-slate-400">Logs Analizados</p>
                 <p class="text-2xl font-bold text-white mt-1">{{ summary.total_lines }}</p>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p class="text-xs text-slate-400">Total Tokens Extraídos</p>
-                <p class="text-2xl font-bold text-sky-400 mt-1">{{ summary.total_tokens }}</p>
+                <p class="text-xs text-slate-400">Tokens en Logs Válidos / Totales</p>
+                <p class="text-2xl font-bold text-sky-400 mt-1">
+                    {{ summary.valid_logs_tokens }} <span class="text-sm font-normal text-slate-400">/ {{ summary.total_tokens }} insp.</span>
+                </p>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <p class="text-xs text-slate-400">Logs Aceptados (Válidos)</p>
@@ -160,172 +177,189 @@
             </div>
         </section>
 
-        <!-- BARRA DE PESTAÑAS -->
+        <!-- BARRA DE PESTAÑAS (H-04: Catálogo único desacoplado para evitar redundancia) -->
         <div class="border-b border-slate-800 flex flex-wrap gap-2">
             <button id="btn-tab-tokens" onclick="switchMainTab('tab-tokens')"
                 class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-emerald-500 text-emerald-400 bg-slate-800/90 rounded-t-lg transition">
-                1. Tokens, Lexemas, Autómatas JFLAP (.JFF) y Árboles por Token
+                1. Resultados por Log, Tabla de Tokens y Trazas en Vivo
+            </button>
+            <button id="btn-tab-catalogo-jflap" onclick="switchMainTab('tab-catalogo-jflap')"
+                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
+                2. Catálogo Maestro de Autómatas JFLAP 7.1 (AFD, AFND Thompson, Subconjuntos y .JFF)
             </button>
             <button id="btn-tab-arboles-gen" onclick="switchMainTab('tab-arboles-gen')"
                 class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
-                2. Árboles Sintácticos y Semánticos Generales (Raíz y Ramas)
+                3. Árboles Sintácticos y Semánticos Generales (GLC y PDA)
             </button>
         </div>
 
-        <!-- PESTAÑA 1 -->
-        <div id="tab-tokens" class="main-tab-content space-y-8">
+        <!-- ================================================================== -->
+        <!-- PESTAÑA 1: RESULTADOS POR LOG Y TRAZAS REALES SIN REDUNDANCIA      -->
+        <!-- ================================================================== -->
+        <div id="tab-tokens" class="main-tab-content space-y-6">
             {% for res in results %}
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
-                <div class="flex flex-wrap justify-between items-center gap-4 border-b border-slate-800 pb-4">
+            <details class="bg-slate-900 border {% if res.is_valid %}border-slate-800{% else %}border-rose-800/80{% endif %} rounded-xl overflow-hidden shadow-lg" {% if loop.first or not res.is_valid %}open{% endif %}>
+                <summary class="px-6 py-4 cursor-pointer flex flex-wrap justify-between items-center gap-4 bg-slate-900 hover:bg-slate-800/60 transition">
                     <div class="space-y-1">
-                        <span class="text-xs font-mono uppercase text-slate-400">Log Línea #{{ res.line_number }}</span>
+                        <span class="text-xs font-mono uppercase text-slate-400">Log Línea #{{ res.line_number }} ({{ res.tokens | length }} tokens inspeccionados)</span>
                         <p class="font-mono text-sm text-slate-100 break-all">{{ res.raw }}</p>
-                        {% if res.integrity_hmac %}
-                        <p class="text-[11px] font-mono text-emerald-400 break-all">
-                            <strong>HMAC-SHA256 (Integridad):</strong> {{ res.integrity_hmac }}
-                        </p>
-                        {% endif %}
                     </div>
                     {% if res.is_valid %}
                         <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-700">✅ {{ res.status }}</span>
                     {% else %}
                         <span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-400 border border-rose-700">❌ {{ res.status }}</span>
                     {% endif %}
+                </summary>
+
+                <div class="p-6 space-y-5 border-t border-slate-800">
+                    {% if res.integrity_hmac %}
+                    <div class="bg-emerald-950/40 border border-emerald-800/80 rounded-lg px-4 py-2.5 text-xs font-mono text-emerald-300 break-all">
+                        <strong>HMAC-SHA256 (64 hex verificados con compare_digest):</strong> {{ res.integrity_hmac }}
+                    </div>
+                    {% endif %}
+
+                    {% if res.errors %}
+                    <div class="bg-rose-950/70 border border-rose-700 rounded-lg p-4 text-xs text-rose-200 space-y-1">
+                        <p class="font-bold text-rose-400 uppercase">Diagnóstico Unificado de Rechazo (Línea y Columna):</p>
+                        {% for err in res.errors %}
+                            <p class="font-mono">• {{ err }}</p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- TABLA DE TOKENS CON TRAZA EN VIVO Y ENLACE AL CATÁLOGO DE AUTÓMATAS -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-800 text-slate-200 uppercase">
+                                    <th class="p-2.5 border border-slate-700">#</th>
+                                    <th class="p-2.5 border border-slate-700">Posición</th>
+                                    <th class="p-2.5 border border-slate-700">Token</th>
+                                    <th class="p-2.5 border border-slate-700">Lexema</th>
+                                    <th class="p-2.5 border border-slate-700">Traza Real de Simulación (AFD / AFND)</th>
+                                    <th class="p-2.5 border border-slate-700">Estado Semántico</th>
+                                    <th class="p-2.5 border border-slate-700">Autómata JFLAP</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800">
+                                {% for tok in res.tokens %}
+                                <tr class="{% if tok.type == 'ERROR_LEXICO' %}bg-rose-950/60{% else %}hover:bg-slate-800/40{% endif %}">
+                                    <td class="p-2.5 border border-slate-800 font-mono text-slate-400">{{ tok.index }}</td>
+                                    <td class="p-2.5 border border-slate-800 font-mono text-slate-300 whitespace-nowrap">L{{ tok.line }}:C{{ tok.column }}</td>
+                                    <td class="p-2.5 border border-slate-800 font-bold font-mono {% if tok.type == 'ERROR_LEXICO' %}text-rose-400{% else %}text-emerald-400{% endif %}">{{ tok.type }}</td>
+                                    <td class="p-2.5 border border-slate-800 font-mono text-amber-300">{{ tok.value }}</td>
+                                    <td class="p-2.5 border border-slate-800 font-mono text-[11px] text-slate-300">{{ tok.live_trace }}</td>
+                                    <td class="p-2.5 border border-slate-800">
+                                        {% if tok.sem_ok and res.valid_lexical %}
+                                            <span class="text-emerald-400 font-semibold">✔ {{ tok.sem_msg }}</span>
+                                        {% elif not tok.sem_ok %}
+                                            <span class="text-rose-400 font-semibold">✖ {{ tok.sem_msg }}</span>
+                                        {% else %}
+                                            <span class="text-amber-300 font-semibold">⚠ {{ tok.sem_msg }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="p-2.5 border border-slate-800 text-center">
+                                        {% if tok.type != 'ERROR_LEXICO' %}
+                                        <button type="button" onclick="jumpToAutomaton('{{ tok.type }}')"
+                                            class="px-2.5 py-1 rounded bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 font-semibold text-[11px] border border-amber-600/60 transition whitespace-nowrap">
+                                            ☕ Ver AFD/AFND
+                                        </button>
+                                        {% else %}
+                                        <span class="text-rose-400 font-mono text-[11px]">Estado qT</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-
-                {% if res.errors %}
-                <div class="bg-rose-950/60 border border-rose-800 rounded-lg p-4 text-xs text-rose-200 space-y-1">
-                    <p class="font-bold text-rose-400">Diagnóstico de Validación:</p>
-                    {% for err in res.errors %}
-                        <p>• {{ err }}</p>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                <!-- TABLA DE TOKENS Y LEXEMAS -->
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr class="bg-slate-800 text-slate-200 uppercase">
-                                <th class="p-3 border border-slate-700">#</th>
-                                <th class="p-3 border border-slate-700">Token (Agrupador)</th>
-                                <th class="p-3 border border-slate-700">Lexema Reconocido</th>
-                                <th class="p-3 border border-slate-700">Categoría Léxica</th>
-                                <th class="p-3 border border-slate-700">Expresión Regular</th>
-                                <th class="p-3 border border-slate-700">Validación Semántica y Seguridad</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-800">
-                            {% for tok in res.tokens %}
-                            <tr class="hover:bg-slate-800/40">
-                                <td class="p-3 border border-slate-800 font-mono text-slate-400">{{ tok.index }}</td>
-                                <td class="p-3 border border-slate-800 font-bold text-emerald-400 font-mono">{{ tok.type }}</td>
-                                <td class="p-3 border border-slate-800 font-mono text-amber-300">{{ tok.value }}</td>
-                                <td class="p-3 border border-slate-800 text-slate-300">{{ tok.categoria }}</td>
-                                <td class="p-3 border border-slate-800 font-mono text-sky-300">{{ tok.regex }}</td>
-                                <td class="p-3 border border-slate-800">
-                                    {% if tok.sem_ok %}
-                                        <span class="text-emerald-400 font-semibold">✔ {{ tok.sem_msg }}</span>
-                                    {% else %}
-                                        <span class="text-rose-400 font-semibold">✖ {{ tok.sem_msg }}</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- INSPECTOR JFLAP Y ÁRBOLES POR CADA TOKEN -->
-                <div class="space-y-4 pt-2">
-                    <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider">
-                        Gráficos JFLAP 7.1 (AFD con Estado Trampa qT y AFND) y Árboles de cada Token
-                    </h3>
-
-                    {% for tok in res.tokens %}
-                    <details class="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden group" {% if loop.first %}open{% endif %}>
-                        <summary class="px-4 py-3 cursor-pointer flex flex-wrap justify-between items-center bg-slate-900 hover:bg-slate-800/80 transition">
-                            <div class="flex items-center gap-3">
-                                <span class="px-2.5 py-0.5 rounded bg-amber-950 border border-amber-600 text-amber-300 font-mono text-xs font-bold">Token #{{ tok.index }}: {{ tok.type }}</span>
-                                <span class="font-mono text-sm text-white font-bold">{{ tok.value }}</span>
-                                <span class="text-xs text-slate-400">({{ tok.categoria }})</span>
-                            </div>
-                            <span class="text-xs text-emerald-400 font-semibold">▼ Ver Diagramas JFLAP (.JFF), Tabla δ y Árboles</span>
-                        </summary>
-
-                        <div class="p-5 space-y-6 border-t border-slate-800">
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <!-- VENTANA JFLAP AFD -->
-                                <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
-                                    <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
-                                        <span>☕ JFLAP 7.1 — AFD (Determinista) para {{ tok.type }}</span>
-                                        <span class="font-mono text-[11px] bg-amber-200 px-2 py-0.5 rounded border border-amber-500">{{ tok.quintupla_afd.delta }}</span>
-                                    </div>
-                                    <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
-                                        Q = {{ tok.quintupla_afd.Q }} | Σ = {{ tok.quintupla_afd.Sigma }} | q0 = {{ tok.quintupla_afd.q0 }} | F = {{ tok.quintupla_afd.F }}
-                                    </div>
-                                    {{ tok.jflap_afd_svg | safe }}
-                                </div>
-
-                                <!-- VENTANA JFLAP AFND -->
-                                <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
-                                    <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
-                                        <span>☕ JFLAP 7.1 — AFND (No Determinista) para {{ tok.type }}</span>
-                                        <span class="font-mono text-[11px] bg-sky-200 px-2 py-0.5 rounded border border-sky-500">{{ tok.quintupla_afnd.delta }}</span>
-                                    </div>
-                                    <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
-                                        Q' = {{ tok.quintupla_afnd.Q }} | Σ = {{ tok.quintupla_afnd.Sigma }} | q0 = {{ tok.quintupla_afnd.q0 }} | F' = {{ tok.quintupla_afnd.F }}
-                                    </div>
-                                    {{ tok.jflap_afnd_svg | safe }}
-                                </div>
-                            </div>
-
-                            <!-- SIMULACIÓN MULTIPLE RUN DE JFLAP -->
-                            <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                                <h4 class="text-xs font-bold text-amber-300 uppercase mb-2">Simulación JFLAP: Input → Multiple Run ({{ tok.type }})</h4>
-                                <table class="w-full text-left border-collapse text-xs">
-                                    <thead>
-                                        <tr class="bg-slate-800 text-slate-300">
-                                            <th class="p-2 border border-slate-700">Input (Cadena Evaluada)</th>
-                                            <th class="p-2 border border-slate-700">Result (JFLAP 7.1)</th>
-                                            <th class="p-2 border border-slate-700">Traza Formal de Estados</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for inp, res_run, mot in tok.jflap_runs %}
-                                        <tr>
-                                            <td class="p-2 border border-slate-800 font-mono text-white">{{ inp }}</td>
-                                            <td class="p-2 border border-slate-800 font-bold {% if res_run == 'Accept' %}text-emerald-400 bg-emerald-950/40{% else %}text-rose-400 bg-rose-950/40{% endif %}">{{ res_run }}</td>
-                                            <td class="p-2 border border-slate-800 text-slate-300">{{ mot }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <!-- ÁRBOL SINTÁCTICO Y SEMÁNTICO DEL TOKEN -->
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div class="bg-slate-900 p-4 rounded-lg border border-slate-800 space-y-2">
-                                    <h4 class="text-xs font-bold text-sky-400 uppercase">Árbol Sintáctico del Token (Raíz, Ramas y Hojas)</h4>
-                                    {{ tok.syn_tree_svg | safe }}
-                                    <p class="text-[11px] font-mono text-slate-400 pt-1">
-                                        <strong class="text-slate-200">Paréntesis anidados:</strong> {{ tok.paren_rep }}
-                                    </p>
-                                </div>
-                                <div class="bg-slate-900 p-4 rounded-lg border border-slate-800 space-y-2">
-                                    <h4 class="text-xs font-bold text-purple-400 uppercase">Árbol Semántico del Token (Atributos y Dominio)</h4>
-                                    {{ tok.sem_tree_svg | safe }}
-                                </div>
-                            </div>
-                        </div>
-                    </details>
-                    {% endfor %}
-                </div>
-            </div>
+            </details>
             {% endfor %}
         </div>
 
-        <!-- PESTAÑA 2 -->
+        <!-- ================================================================== -->
+        <!-- PESTAÑA 2: CATÁLOGO MAESTRO DE AUTÓMATAS (1 POR TIPO DE TOKEN)     -->
+        <!-- ================================================================== -->
+        <div id="tab-catalogo-jflap" class="main-tab-content hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <h3 class="text-base font-bold text-amber-400">
+                    Catálogo Maestro de Autómatas Finitos por Categoría Léxica (H-04: Referencia Única Desacoplada)
+                </h3>
+                <p class="text-xs text-slate-300 mt-1">
+                    Cada categoría léxica presenta su definición formal sin ambigüedades (<code>q_ini = q0</code>), su AFD completo con estado trampa <code>qT</code>, su AFND derivado por Construcción de Thompson, la relación de equivalencia por Construcción de Subconjuntos (<code>λ-clausura</code>) y la exportación directa a <code>.jff</code> para JFLAP 7.1.
+                </p>
+            </div>
+
+            {% for tok_type, cat in master_catalog.items() %}
+            <details id="cat-{{ tok_type }}" class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg" {% if loop.first %}open{% endif %}>
+                <summary class="px-6 py-4 cursor-pointer flex flex-wrap justify-between items-center bg-slate-800/80 hover:bg-slate-800 transition">
+                    <div class="flex items-center gap-3">
+                        <span class="px-3 py-1 rounded bg-amber-950 border border-amber-500 text-amber-300 font-mono text-xs font-bold">{{ tok_type }}</span>
+                        <span class="text-xs font-mono text-slate-300">{{ cat.subset_info }}</span>
+                    </div>
+                    <span class="text-xs text-emerald-400 font-semibold">▼ Desplegar Diagramas JFLAP 7.1, Tablas δ y Archivos .JFF</span>
+                </summary>
+
+                <div class="p-6 space-y-6 border-t border-slate-800">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- VENTANA JFLAP AFD -->
+                        <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
+                            <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
+                                <span>☕ JFLAP 7.1 — AFD (Determinista) para {{ tok_type }}</span>
+                                <span class="font-mono text-[11px] bg-amber-200 px-2 py-0.5 rounded border border-amber-500">{{ cat.quintupla_afd.delta }}</span>
+                            </div>
+                            <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
+                                Q = {{ cat.quintupla_afd.Q }} | {{ cat.quintupla_afd.Sigma }} | q_ini = {{ cat.quintupla_afd.q_ini }} | F = {{ cat.quintupla_afd.F }}
+                            </div>
+                            {{ cat.jflap_afd_svg | safe }}
+                        </div>
+
+                        <!-- VENTANA JFLAP AFND -->
+                        <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
+                            <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
+                                <span>☕ JFLAP 7.1 — AFND (Construcción de Thompson) para {{ tok_type }}</span>
+                                <span class="font-mono text-[11px] bg-sky-200 px-2 py-0.5 rounded border border-sky-500">{{ cat.quintupla_afnd.delta }}</span>
+                            </div>
+                            <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
+                                Q' = {{ cat.quintupla_afnd.Q }} | {{ cat.quintupla_afnd.Sigma }} | q_ini = {{ cat.quintupla_afnd.q_ini }} | F' = {{ cat.quintupla_afnd.F }}
+                            </div>
+                            {{ cat.jflap_afnd_svg | safe }}
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-4">
+                        <p class="text-xs font-mono text-sky-300 mb-2">
+                            <strong>Equivalencia AFND → AFD (Construcción de Subconjuntos de Rabin-Scott):</strong> {{ cat.subset_info }}
+                        </p>
+                        <h4 class="text-xs font-bold text-amber-300 uppercase mb-2">Simulación Dinámica JFLAP: Input → Multiple Run ({{ tok_type }})</h4>
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-800 text-slate-300">
+                                    <th class="p-2 border border-slate-700">Input (Cadena Evaluada)</th>
+                                    <th class="p-2 border border-slate-700">Result (JFLAP 7.1)</th>
+                                    <th class="p-2 border border-slate-700">Traza Ejecutada sobre el AFD y el AFND</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for inp, res_run, mot in cat.jflap_runs %}
+                                <tr>
+                                    <td class="p-2 border border-slate-800 font-mono text-white">{{ inp }}</td>
+                                    <td class="p-2 border border-slate-800 font-bold {% if res_run == 'Accept' %}text-emerald-400 bg-emerald-950/40{% else %}text-rose-400 bg-rose-950/40{% endif %}">{{ res_run }}</td>
+                                    <td class="p-2 border border-slate-800 font-mono text-[11px] text-slate-300">{{ mot }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- PESTAÑA 3: ÁRBOLES SINTÁCTICOS Y SEMÁNTICOS GENERALES              -->
+        <!-- ================================================================== -->
         <div id="tab-arboles-gen" class="main-tab-content hidden space-y-8">
             {% for res in results %}
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
@@ -360,14 +394,14 @@
 
                     <div class="bg-slate-950 border border-slate-800 rounded-lg p-5 space-y-3">
                         <h4 class="text-sm font-bold text-purple-400 uppercase">
-                            Árbol Semántico General (AST Decorado con Validación de Calendario, Rangos IPv4 y SLA SOC)
+                            Árbol Semántico General (AST Decorado con Validación de Calendario, Rangos IPv4 y Catálogo SBS)
                         </h4>
                         {{ res.general_sem_svg | safe }}
                     </div>
                 </div>
                 {% else %}
-                <div class="bg-rose-950/50 border border-rose-800 rounded-lg p-4 text-xs text-rose-200">
-                    La cadena presenta un fallo sintáctico/léxico ({{ res.errors[0] }}), por lo que la derivación del árbol general se detiene antes de culminar en las hojas.
+                <div class="bg-rose-950/50 border border-rose-800 rounded-lg p-4 text-xs text-rose-200 font-mono">
+                    La cadena presenta un fallo léxico/sintáctico ({{ res.errors[0] }}), por lo que la derivación del árbol general se detiene antes de culminar en las hojas.
                 </div>
                 {% endif %}
             </div>

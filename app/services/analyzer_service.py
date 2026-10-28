@@ -3,16 +3,19 @@ import re
 import csv
 import json
 import hmac
+import uuid
 import hashlib
 import calendar
 from datetime import datetime
-from app.config import Config
 from app.models.token_model import TokenModel
 from app.patterns.singleton.grammar_singleton import GrammarSingleton
-from app.services.jflap_service import build_jflap_models_for_token
+from app.services.jflap_service import build_master_automata_catalog, simulate_token_both_traces
 from app.services.tree_service import build_token_real_trees, render_real_tree_svg, tree_to_parentheses
 
 grammar = GrammarSingleton()
+
+# H-04: Catálogo maestro precalculado 1 sola vez por tipo de token (evita redundancia y desborde de DOM)
+MASTER_AUTOMATA_CATALOG = build_master_automata_catalog()
 
 MAX_LINE_LENGTH = 2048
 MAX_LINES_PER_BATCH = 200
@@ -22,7 +25,6 @@ DEFAULT_SAMPLE_LOGS = """2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"u
 2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}
 2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3"""
 
-# Punto 2.9: Detección basada en patrones heurísticos (documentada con alcance acotado)
 SUSPICIOUS_INPUT_PATTERNS = re.compile(
     r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|TRUNCATE)\b|--|;|\bOR\b\s+['\"\d]+=['\"\d]+|"
     r"\$ne|\$gt|\$lt|\$where|<script|javascript:|\.\./|\x00)",
@@ -30,12 +32,15 @@ SUSPICIOUS_INPUT_PATTERNS = re.compile(
 )
 
 SAFE_KEY_IDENTIFIER = re.compile(r'^"[a-zA-Z0-9_\-\.]+"$')
-VALID_JSON_ESCAPE_REGEX = re.compile(r'\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4})')
+VALID_JSON_ESCAPE_REGEX = re.compile(r'\\["\\/bfnrt]')
 
 
 def validate_timestamp_strict(ts_str):
-    """Punto 2.4: Comprueba el formato ISO-8601 y la existencia real en el calendario (incluyendo años bisiestos)."""
-    if len(ts_str) != 19 or ts_str[4] != '-' or ts_str[7] != '-' or ts_str[10] != 'T' or ts_str[13] != ':' or ts_str[16] != ':':
+    """H-01 y B-15: Verifica formato exacto AAAA-MM-DDTHH:MM:SS y validez en calendario gregoriano (bisiestos y días/mes)."""
+    if len(ts_str) != 19:
+        extra = ts_str[19:]
+        return False, f"Formato TIMESTAMP fuera del alcance UTC local: no se admiten sufijos de zona o fracción ({extra!r})."
+    if ts_str[4] != '-' or ts_str[7] != '-' or ts_str[10] != 'T' or ts_str[13] != ':' or ts_str[16] != ':':
         return False, "Formato TIMESTAMP inválido (se requiere AAAA-MM-DDTHH:MM:SS)."
     try:
         year = int(ts_str[0:4])
@@ -48,10 +53,11 @@ def validate_timestamp_strict(ts_str):
         if not (1970 <= year <= 2100):
             return False, f"Año fuera de rango operativo ({year})."
         if not (1 <= month <= 12):
-            return False, f"Mes inválido ({month}); debe estar entre 01 y 12."
+            return False, f"Mes inválido ({month:02d}); el AFD y el calendario exigen rango 01..12."
         max_day = calendar.monthrange(year, month)[1]
         if not (1 <= day <= max_day):
-            return False, f"Día inválido ({day}) para el mes {month:02d}/{year} (máx: {max_day})."
+            leap_note = "año bisiesto" if calendar.isleap(year) else "año no bisiesto"
+            return False, f"Día inexistente ({day:02d}) para el mes {month:02d}/{year} ({leap_note}, máximo {max_day} días)."
         if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
             return False, f"Hora inválida ({hour:02d}:{minute:02d}:{second:02d}); rango permitido 00:00:00 a 23:59:59."
         return True, f"Fecha/hora calendario válida ({ts_str})"
@@ -60,7 +66,7 @@ def validate_timestamp_strict(ts_str):
 
 
 def validate_ipv4_strict(ip_str):
-    """Punto 2.3: Comprueba que cada uno de los 4 octetos IPv4 esté entre 0 y 255 sin ceros iniciales ambiguos."""
+    """Comprueba que cada uno de los 4 octetos IPv4 esté entre 0 y 255 sin ceros iniciales."""
     parts = ip_str.split('.')
     if len(parts) != 4:
         return False, "La dirección IPv4 debe tener exactamente 4 octetos."
@@ -68,7 +74,7 @@ def validate_ipv4_strict(ip_str):
         if not part.isdigit():
             return False, f"Octeto #{idx} ({part!r}) no es numérico."
         if len(part) > 1 and part.startswith('0'):
-            return False, f"Octeto #{idx} ({part!r}) contiene ceros iniciales ambiguos."
+            return False, f"Octeto #{idx} ({part!r}) contiene ceros iniciales no permitidos."
         val = int(part)
         if not (0 <= val <= 255):
             return False, f"Octeto #{idx} ({val}) fuera del intervalo válido [0..255]."
@@ -76,7 +82,7 @@ def validate_ipv4_strict(ip_str):
 
 
 def validate_string_security_and_type(str_lexeme, is_key=False):
-    """Puntos 2.5 y 2.9: Valida secuencias de escape JSON (\\\", \\\\) y detecta patrones sospechosos."""
+    """H-05: Valida secuencias de escape JSON simplificado y detecta patrones sospechosos."""
     if len(str_lexeme) < 2 or not (str_lexeme.startswith('"') and str_lexeme.endswith('"')):
         return False, "Cadena mal delimitada por comillas."
     inner = str_lexeme[1:-1]
@@ -85,38 +91,34 @@ def validate_string_security_and_type(str_lexeme, is_key=False):
     if len(inner) > 256:
         return False, "Longitud de cadena excede el límite de 256 caracteres."
 
-    # Verificar que toda barra invertida corresponda a una secuencia de escape JSON válida
     cleaned_escapes = VALID_JSON_ESCAPE_REGEX.sub('', inner)
     if '\\' in cleaned_escapes or '"' in cleaned_escapes:
-        return False, "Secuencia de escape JSON inválida o comilla sin escapar."
+        return False, "Secuencia de escape no soportada en JSON simplificado (solo se admiten \\\", \\\\, \\/, \\b, \\f, \\n, \\r, \\t)."
 
     if is_key and not SAFE_KEY_IDENTIFIER.match(str_lexeme):
         return False, f"La clave JSON {str_lexeme} contiene caracteres no permitidos para un identificador."
     match = SUSPICIOUS_INPUT_PATTERNS.search(inner)
     if match:
         return False, f"Entrada sospechosa detectada por patrón ({match.group(0)!r})."
-    return True, "Cadena JSON verificada"
+    return True, "Literal de cadena verificado"
 
 
 def _get_hmac_secret_key():
-    """Obtiene la clave secreta desde variable de entorno o clave de entorno académico por defecto."""
-    return os.environ.get('SOC_HMAC_SECRET_KEY', 'USIL_TCOM_SOC_INTEGRITY_KEY_2026').encode('utf-8')
+    """H-03: Carga la clave secreta desde la variable de entorno del servidor."""
+    env_key = os.environ.get('SOC_HMAC_SECRET_KEY')
+    if env_key:
+        return env_key.encode('utf-8')
+    return b'SOC_EPHEMERAL_DEV_HMAC_KEY_CONFIGURED_VIA_ENV'
 
 
 def compute_record_hmac(raw_log):
-    """Punto 2.12: Genera el código de autenticación de mensaje HMAC-SHA256 completo (64 caracteres hex)."""
     return hmac.new(_get_hmac_secret_key(), raw_log.strip().encode('utf-8'), hashlib.sha256).hexdigest()
 
 
 def verify_record_hmac(raw_log, expected_hmac):
-    """
-    Punto 2.12: Procedimiento efectivo de verificación de integridad en tiempo constante
-    mediante hmac.compare_digest para detectar cualquier alteración del registro.
-    """
     if not expected_hmac:
         return False
-    calculated = compute_record_hmac(raw_log)
-    return hmac.compare_digest(calculated, expected_hmac)
+    return hmac.compare_digest(compute_record_hmac(raw_log), expected_hmac)
 
 
 def analyze_single_log(log_line, line_number=1):
@@ -133,8 +135,9 @@ def analyze_single_log(log_line, line_number=1):
             'valid_security': False,
             'is_valid': False,
             'status': 'ERROR DE LÍMITE DE ENTRADA',
-            'errors': [f"Línea {line_number}: Excede la longitud máxima permitida ({MAX_LINE_LENGTH} caracteres)."],
+            'errors': [f"Línea {line_number}, Col 1: Excede la longitud máxima permitida ({MAX_LINE_LENGTH} caracteres)."],
             'tokens': [],
+            'valid_token_count': 0,
             'pda_trace': [],
             'general_syn_svg': '',
             'general_sem_svg': '',
@@ -143,38 +146,105 @@ def analyze_single_log(log_line, line_number=1):
             'hmac_verified': False
         }
 
-    for idx, mo in enumerate(re.finditer(grammar.TOK_REGEX, log_line)):
+    for mo in re.finditer(grammar.TOK_REGEX, log_line):
         kind = mo.lastgroup
         value = mo.group()
         col = mo.start() + 1
 
         if kind in ('SPACE', 'NEWLINE'):
             continue
-        elif kind == 'MISMATCH':
-            lexical_errors.append(
-                f"Línea {line_number}, Col {col}: Símbolo ilegal {value!r} ∉ Σ. El AFD transita al Estado Trampa (qT)."
+
+        # H-05 y M-09: Incluir tokens ilegales (MISMATCH o LEADING_ZERO como 007) explícitamente en la tabla
+        if kind == 'MISMATCH':
+            err_detail = (
+                f"Línea {line_number}, Col {col}: Símbolo ilegal {value!r} ∉ Σ_token. "
+                f"El AFD transita al Estado Trampa (qT)."
             )
+            lexical_errors.append(err_detail)
+            meta = grammar.TOKEN_METADATA['ERROR_LEXICO']
+            bad_tok = TokenModel(
+                index=len(tokens) + 1,
+                type='ERROR_LEXICO',
+                value=value,
+                line=line_number,
+                column=col,
+                categoria=meta['categoria'],
+                regex=meta['regex'],
+                quintupla_afd={},
+                quintupla_afnd={},
+                jflap_afd_svg='',
+                jflap_afnd_svg='',
+                jflap_runs=[],
+                syn_tree_svg='',
+                sem_tree_svg='',
+                paren_rep=f"( ERROR_LEXICO:{value} )",
+                sem_ok=False,
+                sem_msg=f"Símbolo ilegal {value!r} en Col {col} (Rechazado en qT)"
+            ).to_dict()
+            bad_tok['live_trace'] = f"Posición Col {col}: '{value}' ∉ Σ_token → Transición inmediata a qT (Reject)"
+            tokens.append(bad_tok)
             continue
 
-        # Única llamada limpia que desempaqueta los 5 valores de build_jflap_models_for_token
-        jflap_afd_svg, jflap_afnd_svg, jflap_runs, quintupla_afd, quintupla_afnd = build_jflap_models_for_token(kind, value)
+        if kind == 'LEADING_ZERO':
+            err_detail = (
+                f"Línea {line_number}, Col {col}: Entero con cero inicial prohibido {value!r} "
+                f"(JSON exige 0|[1-9][0-9]*; el AFD de NUMBER transita de q1 a qT)."
+            )
+            lexical_errors.append(err_detail)
+            meta = grammar.TOKEN_METADATA['NUMBER']
+            bad_tok = TokenModel(
+                index=len(tokens) + 1,
+                type='ERROR_LEXICO',
+                value=value,
+                line=line_number,
+                column=col,
+                categoria='Entero Inválido (Cero a la izquierda)',
+                regex=meta['regex'],
+                quintupla_afd={},
+                quintupla_afnd={},
+                jflap_afd_svg='',
+                jflap_afnd_svg='',
+                jflap_runs=[],
+                syn_tree_svg='',
+                sem_tree_svg='',
+                paren_rep=f"( ERROR_LEXICO:{value} )",
+                sem_ok=False,
+                sem_msg=f"Rechazado por AFD de NUMBER (q0 --'0'--> q1 --'{value[1]}'--> qT)"
+            ).to_dict()
+            bad_tok['live_trace'] = simulate_token_both_traces('NUMBER', value)
+            tokens.append(bad_tok)
+            continue
+
         syn_svg, sem_svg, paren_rep, sem_ok, sem_msg = build_token_real_trees(kind, value)
 
         if kind == 'TIMESTAMP':
             sem_ok, sem_msg = validate_timestamp_strict(value)
+            # H-01: Si el AFD de TIMESTAMP rechaza la cadena (mes 00, 13..19, día 00, 32..39, hora 24..29),
+            # registrarlo también en la traza léxica/semántica.
+            live_trace = simulate_token_both_traces('TIMESTAMP', value[:19])
+            if "Reject" in live_trace.split("|")[0]:
+                lexical_errors.append(
+                    f"Línea {line_number}, Col {col}: Marca temporal {value!r} rechazada por el AFD de TIMESTAMP ({ sem_msg })."
+                )
         elif kind == 'IP':
             sem_ok, sem_msg = validate_ipv4_strict(value)
+            live_trace = simulate_token_both_traces('IP', value)
         elif kind == 'STRING':
             sem_ok, sem_msg = validate_string_security_and_type(value, is_key=False)
+            live_trace = simulate_token_both_traces('STRING', value)
         elif kind == 'NUMBER':
+            live_trace = simulate_token_both_traces('NUMBER', value)
             try:
                 num_val = int(value)
                 if not (0 <= num_val <= 10**9):
-                    sem_ok, sem_msg = False, f"Valor numérico ({num_val}) fuera de rango operativo."
+                    sem_ok, sem_msg = False, f"Valor numérico ({num_val}) fuera del rango [0..10^9]."
             except ValueError:
                 sem_ok, sem_msg = False, "Constante entera inválida."
+        else:
+            live_trace = simulate_token_both_traces(kind, value)
 
         meta = grammar.TOKEN_METADATA.get(kind, {})
+        master_ref = MASTER_AUTOMATA_CATALOG.get(kind, {})
 
         tok_obj = TokenModel(
             index=len(tokens) + 1,
@@ -184,20 +254,26 @@ def analyze_single_log(log_line, line_number=1):
             column=col,
             categoria=meta.get('categoria', ''),
             regex=meta.get('regex', ''),
-            quintupla_afd=quintupla_afd,
-            quintupla_afnd=quintupla_afnd,
-            jflap_afd_svg=jflap_afd_svg,
-            jflap_afnd_svg=jflap_afnd_svg,
-            jflap_runs=jflap_runs,
+            quintupla_afd=master_ref.get('quintupla_afd', {}),
+            quintupla_afnd=master_ref.get('quintupla_afnd', {}),
+            jflap_afd_svg='',
+            jflap_afnd_svg='',
+            jflap_runs=[],
             syn_tree_svg=syn_svg,
             sem_tree_svg=sem_svg,
             paren_rep=paren_rep,
             sem_ok=sem_ok,
             sem_msg=sem_msg
-        )
-        tokens.append(tok_obj.to_dict())
+        ).to_dict()
+        tok_obj['live_trace'] = live_trace
+        tokens.append(tok_obj)
 
+    # M-09: Si la línea tiene un error léxico, marcar el registro como rechazado desde el inicio
+    # y no presentar sus demás tokens como semánticamente aceptados de forma aislada.
     if lexical_errors:
+        for t in tokens:
+            if t['type'] != 'ERROR_LEXICO' and t['sem_ok']:
+                t['sem_msg'] = f"{t['sem_msg']} (Línea invalidada por Error Léxico)"
         return {
             'line_number': line_number,
             'raw': log_line,
@@ -209,7 +285,8 @@ def analyze_single_log(log_line, line_number=1):
             'status': 'ERROR LÉXICO',
             'errors': lexical_errors,
             'tokens': tokens,
-            'pda_trace': ['❌ Fase Léxica rechazada: el Autómata de Pila no inicia debido a tokens ilegales ∉ Σ.'],
+            'valid_token_count': 0,
+            'pda_trace': ['❌ Fase Léxica rechazada: el Autómata de Pila no inicia porque la cadena no pertenece a Σ_token*.'],
             'general_syn_svg': '',
             'general_sem_svg': '',
             'general_paren': '',
@@ -219,44 +296,61 @@ def analyze_single_log(log_line, line_number=1):
 
     pos = 0
     pda_stack = ['Z0']
-    pda_trace = ['(q0, w, Z0) ⊢ Configuración inicial del Autómata de Pila con fondo Z0']
+    pda_trace = ['(q0, w, Z0) ⊢ Configuración inicial del Autómata de Pila con símbolo de fondo Z0']
     semantic_fields = []
     semantic_errors = [
-        f"Token {t['type']} ({t['value']}): {t['sem_msg']}"
+        f"Línea {line_number}, Col {t['column']} (Token #{t['index']} {t['type']} {t['value']}): {t['sem_msg']}"
         for t in tokens if not t['sem_ok'] and "Entrada sospechosa" not in t['sem_msg']
     ]
     security_errors = [
-        f"Token {t['type']} ({t['value']}): {t['sem_msg']}"
+        f"Línea {line_number}, Col {t['column']} (Token #{t['index']} {t['type']} {t['value']}): {t['sem_msg']}"
         for t in tokens if not t['sem_ok'] and "Entrada sospechosa" in t['sem_msg']
     ]
 
-    def match(expected_type):
+    def current_line_col():
+        if pos < len(tokens):
+            return tokens[pos]['line'], tokens[pos]['column'], tokens[pos]['index'], tokens[pos]['type'], tokens[pos]['value']
+        last_col = (len(log_line) + 1) if log_line else 1
+        return line_number, last_col, len(tokens) + 1, "FIN_DE_CADENA", "EOF"
+
+    def match(expected_type, expected_set_desc=None):
+        """M-08: Diagnóstico sintáctico unificado con Línea, Columna, conjunto esperado y token encontrado."""
         nonlocal pos
         if pos < len(tokens) and tokens[pos]['type'] == expected_type:
             tok = tokens[pos]
             pos += 1
             return tok, {'label': expected_type, 'sub': tok['value']}
-        actual = tokens[pos]['type'] if pos < len(tokens) else "FIN_DE_CADENA"
-        raise SyntaxError(f"Error Sintáctico en token #{pos+1}: Se esperaba '{expected_type}' pero se encontró '{actual}'.")
+        ln, col, t_idx, actual_type, actual_val = current_line_col()
+        exp_str = expected_set_desc or f"'{expected_type}'"
+        found_str = f"'{actual_type}' ({actual_val!r})" if actual_type != "FIN_DE_CADENA" else "'FIN_DE_CADENA'"
+        raise SyntaxError(
+            f"Línea {ln}, Col {col} (Token #{t_idx}): Error Sintáctico — "
+            f"Se esperaba {exp_str}, pero se encontró {found_str}."
+        )
 
     def parse_payload():
         nonlocal pos
-        _, n_lb = match('LBRACE')
+        _, n_lb = match('LBRACE', "delimitador de apertura '{' (LBRACE)")
         pda_stack.append('{')
-        pda_trace.append(f"Lee '{{' → Apila '{{' (PUSH) | Pila: {''.join(pda_stack)}")
+        pda_trace.append(f"Lee '{{' → Apila '{{' (PUSH) | Pila actual: {''.join(pda_stack)}")
 
         children = [n_lb]
         seen_keys = set()
         if pos < len(tokens) and tokens[pos]['type'] != 'RBRACE':
             children.append(parse_fields(seen_keys))
         else:
-            raise SyntaxError("Error Sintáctico: El objeto PAYLOAD no puede estar vacío; requiere al menos un FIELD.")
+            ln, col, t_idx, act_t, _ = current_line_col()
+            raise SyntaxError(
+                f"Línea {ln}, Col {col} (Token #{t_idx}): Error Sintáctico — "
+                f"El objeto PAYLOAD no puede estar vacío; se esperaba 'STRING' (clave JSON), pero se encontró '{act_t}'."
+            )
 
-        _, n_rb = match('RBRACE')
+        # M-08: Después de parse_fields, los tokens válidos en la gramática eran ',' (consumido en parse_fields) o '}' (RBRACE)
+        _, n_rb = match('RBRACE', "conjunto {',', '}'} (COMMA para otro atributo o RBRACE para cerrar PAYLOAD)")
         children.append(n_rb)
         if pda_stack and pda_stack[-1] == '{':
             pda_stack.pop()
-            pda_trace.append(f"Lee '}}' → Desapila '{{' (POP) | Pila: {''.join(pda_stack)}")
+            pda_trace.append(f"Lee '}}' → Desapila '{{' (POP) | Pila actual: {''.join(pda_stack)}")
 
         return {'label': 'PAYLOAD', 'children': children}
 
@@ -271,30 +365,35 @@ def analyze_single_log(log_line, line_number=1):
 
     def parse_field(seen_keys):
         nonlocal pos
-        k_tok, n_str = match('STRING')
+        k_tok, n_str = match('STRING', "clave 'STRING' entre comillas dobles")
         key_val = k_tok['value']
 
         k_ok, k_msg = validate_string_security_and_type(key_val, is_key=True)
         if not k_ok:
-            msg_formatted = f"Clave JSON {key_val}: {k_msg}"
+            msg_formatted = f"Línea {line_number}, Col {k_tok['column']} (Clave JSON {key_val}): {k_msg}"
             if "Entrada sospechosa" in k_msg and msg_formatted not in security_errors:
                 security_errors.append(msg_formatted)
             elif msg_formatted not in semantic_errors:
                 semantic_errors.append(msg_formatted)
         if key_val in seen_keys:
-            semantic_errors.append(f"Clave JSON duplicada ({key_val}) dentro del mismo objeto PAYLOAD.")
+            semantic_errors.append(
+                f"Línea {line_number}, Col {k_tok['column']}: Clave JSON duplicada ({key_val}) dentro del mismo objeto PAYLOAD."
+            )
         seen_keys.add(key_val)
 
-        _, n_col = match('COLON')
+        _, n_col = match('COLON', "separador ':' (COLON)")
         v_type, n_val = parse_value()
         semantic_fields.append((key_val, v_type))
         return {'label': 'FIELD', 'children': [n_str, n_col, n_val]}
 
     def parse_value():
         nonlocal pos
-        if pos >= len(tokens):
-            raise SyntaxError("Error Sintáctico: Se esperaba un VALUE (STRING, NUMBER o PAYLOAD), pero terminó la cadena.")
-        cur = tokens[pos]['type']
+        ln, col, t_idx, cur, cur_val = current_line_col()
+        if cur == 'FIN_DE_CADENA':
+            raise SyntaxError(
+                f"Línea {ln}, Col {col} (Token #{t_idx}): Error Sintáctico — "
+                f"Se esperaba un VALUE del conjunto {{'STRING', 'NUMBER', 'LBRACE'}}, pero se encontró 'FIN_DE_CADENA'."
+            )
         if cur == 'STRING':
             t, n_s = match('STRING')
             return f"String({t['value']})", {'label': 'VALUE', 'children': [n_s]}
@@ -305,17 +404,25 @@ def analyze_single_log(log_line, line_number=1):
             n_pay = parse_payload()
             return "ObjetoJSON({...})", {'label': 'VALUE', 'children': [n_pay]}
         else:
-            raise SyntaxError(f"Error Sintáctico: Token '{cur}' no es un VALUE válido en la GLC.")
+            raise SyntaxError(
+                f"Línea {ln}, Col {col} (Token #{t_idx}): Error Sintáctico — "
+                f"Se esperaba un VALUE del conjunto {{'STRING', 'NUMBER', 'LBRACE'}} (JSON simplificado), "
+                f"pero se encontró '{cur}' ({cur_val!r})."
+            )
 
     try:
-        ts_tok, n_ts = match('TIMESTAMP')
-        ip_tok, n_ip = match('IP')
-        sev_tok, n_sev = match('SEVERITY')
-        evt_tok, n_evt = match('EVENT_TYPE')
+        ts_tok, n_ts = match('TIMESTAMP', "'TIMESTAMP' (AAAA-MM-DDTHH:MM:SS)")
+        ip_tok, n_ip = match('IP', "'IP' (dirección IPv4 de 4 octetos)")
+        sev_tok, n_sev = match('SEVERITY', "'SEVERITY' ∈ {INFO, WARNING, ERROR, CRITICAL}")
+        evt_tok, n_evt = match('EVENT_TYPE', "'EVENT_TYPE' ([A-Z]+(_[A-Z]+)*)")
         n_payload = parse_payload()
 
         if pos < len(tokens):
-            raise SyntaxError(f"Error Sintáctico: Tokens adicionales fuera de la gramática a partir de {tokens[pos]['value']!r}.")
+            ln, col, t_idx, rem_type, rem_val = current_line_col()
+            raise SyntaxError(
+                f"Línea {ln}, Col {col} (Token #{t_idx}): Error Sintáctico — "
+                f"Se esperaba 'FIN_DE_CADENA' tras cerrar PAYLOAD, pero se encontró token extra '{rem_type}' ({rem_val!r})."
+            )
 
         pda_trace.append("(qF, λ, Z0) ⊢ Pila en Z0 y entrada consumida → SINTAXIS ACEPTADA")
 
@@ -350,7 +457,7 @@ def analyze_single_log(log_line, line_number=1):
                 {'label': 'Tiempo', 'sub': ts_tok['value'], 'children': [{'label': 'Calendario', 'sub': 'ISO-8601 OK' if ts_tok['sem_ok'] else 'Fecha/Hora Inválida'}]},
                 {'label': 'Origen Red', 'sub': ip_tok['value'], 'children': [{'label': 'Octetos', 'sub': '0..255 OK' if ip_tok['sem_ok'] else 'IPv4 Fuera de Rango'}]},
                 {'label': 'Severidad', 'sub': sev_tok['value'], 'children': [{'label': 'SLA', 'sub': sev_tok['sem_msg']}]},
-                {'label': 'Evento', 'sub': evt_tok['value'], 'children': [{'label': 'Normativa', 'sub': 'SBS 504-2021'}]},
+                {'label': 'Evento SOC', 'sub': evt_tok['value'], 'children': [{'label': 'Catálogo SBS', 'sub': 'Registrado OK' if evt_tok['sem_ok'] else 'No Registrado'}]},
                 {'label': 'Atributos JSON', 'children': [
                     {'label': k, 'sub': v} for k, v in semantic_fields
                 ] or [{'label': 'Vacío', 'sub': '{}'}]}
@@ -368,6 +475,7 @@ def analyze_single_log(log_line, line_number=1):
             'status': final_status,
             'errors': all_post_errors,
             'tokens': tokens,
+            'valid_token_count': len(tokens) if overall_valid else 0,
             'pda_trace': pda_trace,
             'general_syn_svg': render_real_tree_svg(general_syn_dict, "syntactic"),
             'general_sem_svg': render_real_tree_svg(general_sem_dict, "semantic"),
@@ -389,6 +497,7 @@ def analyze_single_log(log_line, line_number=1):
             'status': 'ERROR SINTÁCTICO',
             'errors': [str(e)] + semantic_errors + security_errors,
             'tokens': tokens,
+            'valid_token_count': 0,
             'pda_trace': pda_trace,
             'general_syn_svg': '',
             'general_sem_svg': '',
@@ -398,19 +507,18 @@ def analyze_single_log(log_line, line_number=1):
         }
 
 
-def save_all_reports_and_history(results, storage_dir="app/storage"):
+def save_session_reports(results, run_id, storage_dir="app/storage"):
     """
-    Puntos 2.8, 2.11, 2.12 y 2.14:
-    Exporta resultados garantizando consistencia entre contadores, categorías de error,
-    verificación HMAC-SHA256 e historial por ejecución sin sobrescritura accidental.
+    H-03 y B-13:
+    Guarda los reportes aislados por identificador de sesión/ejecución (run_id)
+    para evitar que un visitante descargue datos de otra sesión y prevenir la sobrescritura accidental.
     """
     os.makedirs(storage_dir, exist_ok=True)
-    history_dir = os.path.join(storage_dir, "historial")
-    os.makedirs(history_dir, exist_ok=True)
+    sessions_dir = os.path.join(storage_dir, "sesiones")
+    os.makedirs(sessions_dir, exist_ok=True)
 
     now = datetime.now()
     fecha_gen = now.strftime("%Y-%m-%d %H:%M:%S")
-    run_stamp = now.strftime("%Y%m%d_%H%M%S")
 
     logs_erroneos = []
     logs_verificados = []
@@ -446,31 +554,29 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
 
     payload_erroneos = {
         "metadata": {
-            "sistema": "SOC Analyzer & JFLAP Studio (Almacenamiento basado en archivos JSON/CSV/TXT)",
+            "sistema": "SOC Analyzer & JFLAP Studio",
             "fecha_generacion": fecha_gen,
-            "id_ejecucion": run_stamp,
+            "id_sesion_analisis": run_id,
             "total_procesados": len(results),
             "total_aceptados": len(logs_verificados),
             "total_rechazados": len(logs_erroneos),
-            "alcance_deteccion": (
-                "Detección basada en patrones léxicos/semánticos acotados. "
-                "No sustituye controles de motor de BD como consultas parametrizadas o WAF."
+            "alcance_seguridad": (
+                "Validación léxica, sintáctica (JSON simplificado), semántica (calendario, IPv4, catálogo SBS) "
+                "y detección heurística por patrones. Clave HMAC gestionada mediante variable de entorno."
             )
         },
         "logs_erroneos": logs_erroneos
     }
-    ruta_json_err = os.path.join(storage_dir, "logs_erroneos.json")
-    with open(ruta_json_err, "w", encoding="utf-8") as fj:
+
+    ruta_json_session = os.path.join(sessions_dir, f"logs_erroneos_{run_id}.json")
+    with open(ruta_json_session, "w", encoding="utf-8") as fj:
         json.dump(payload_erroneos, fj, indent=4, ensure_ascii=False)
-    with open(os.path.join(history_dir, f"logs_erroneos_{run_stamp}.json"), "w", encoding="utf-8") as fjh:
-        json.dump(payload_erroneos, fjh, indent=4, ensure_ascii=False)
 
     lineas_txt = [
         "================================================================================",
         "         REPORTE OFICIAL DE AUDITORÍA Y REVISIÓN DE LOGS — ÁREA SOC / TI        ",
         "================================================================================",
-        f"Fecha de emisión        : {fecha_gen} (ID Ejecución: {run_stamp})",
-        f"Arquitectura Almacenam. : Archivos planos estructurados (JSON, CSV y TXT con historial)",
+        f"Fecha de emisión        : {fecha_gen} (ID Análisis: {run_id})",
         f"Total de logs procesados: {len(results)}",
         f"Logs Válidos (Aceptados): {len(logs_verificados)}",
         f"Logs con Error (Rechazo): {len(logs_erroneos)}",
@@ -506,32 +612,14 @@ def save_all_reports_and_history(results, storage_dir="app/storage"):
             )
     lineas_txt.append("================================================================================")
 
-    ruta_txt = os.path.join(storage_dir, "reporte_area_revision.txt")
-    with open(ruta_txt, "w", encoding="utf-8") as ft:
+    ruta_txt_session = os.path.join(sessions_dir, f"reporte_area_revision_{run_id}.txt")
+    with open(ruta_txt_session, "w", encoding="utf-8") as ft:
         ft.write("\n".join(lineas_txt))
-    with open(os.path.join(history_dir, f"reporte_area_revision_{run_stamp}.txt"), "w", encoding="utf-8") as fth:
-        fth.write("\n".join(lineas_txt))
 
-    json_path = os.path.join(storage_dir, 'datos.json')
-    csv_path = os.path.join(storage_dir, 'reportes.csv')
-    with open(json_path, 'w', encoding='utf-8') as jf:
-        json.dump(export_data, jf, ensure_ascii=False, indent=2)
-    with open(csv_path, 'w', newline='', encoding='utf-8') as cf:
-        writer = csv.writer(cf)
-        writer.writerow(['Linea', 'Estado', 'Valido', 'Total_Tokens', 'HMAC_SHA256', 'HMAC_Verificado', 'Log_Crudo'])
-        for item in export_data:
-            writer.writerow([
-                item['linea'], item['estado'], item['valido'],
-                item['total_tokens'], item['hmac_sha256'] or 'N/A',
-                item['hmac_verificado'], item['log_crudo']
-            ])
+    return ruta_json_session, ruta_txt_session
 
 
-def analyze_logs_input(raw_input):
-    """
-    Punto 2.8: Calcula los contadores estadísticos únicamente al finalizar todas las etapas
-    de validación léxica, sintáctica, semántica y de detección de patrones.
-    """
+def analyze_logs_input(raw_input, run_id=None, persist_reports=False):
     if not raw_input or not raw_input.strip():
         raw_input = DEFAULT_SAMPLE_LOGS
 
@@ -549,12 +637,15 @@ def analyze_logs_input(raw_input):
     accepted = sum(1 for r in results if r['is_valid'])
     rejected = sum(1 for r in results if not r['is_valid'])
     total_tokens = sum(len(r['tokens']) for r in results)
+    valid_logs_tokens = sum(r['valid_token_count'] for r in results)
 
-    save_all_reports_and_history(results)
+    if persist_reports and run_id:
+        save_session_reports(results, run_id=run_id)
 
     summary = {
         'total_lines': len(results),
         'total_tokens': total_tokens,
+        'valid_logs_tokens': valid_logs_tokens,
         'accepted': accepted,
         'rejected': rejected,
         'truncated_batch': truncated_batch
@@ -563,5 +654,8 @@ def analyze_logs_input(raw_input):
     return {
         'log_input': raw_input,
         'results': results,
-        'summary': summary
+        'summary': summary,
+        'master_catalog': MASTER_AUTOMATA_CATALOG,
+        'run_id': run_id,
+        'has_analyzed': persist_reports
     }
