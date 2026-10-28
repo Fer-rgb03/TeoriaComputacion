@@ -12,25 +12,35 @@ SUSPICIOUS_TREE_PATTERNS = re.compile(
 )
 
 
-def compute_tree_layout(node, depth=0, x_Step=118, y_step=76, counter=None):
+def compute_tree_layout(node, depth=0, x_step=125, y_step=85, counter=None):
+    """
+    Algoritmo de layout recursivo para árboles n-arios (AST).
+    Asigna una hoja exclusiva en el eje X para cada nodo terminal y promedia 
+    las posiciones X para los nodos padre, sin límite de profundidad (N niveles).
+    """
     if counter is None:
         counter = [0]
+    
     children = node.get('children', [])
     node['depth'] = depth
-    node['y'] = 44 + depth * y_step
+    node['y'] = 45 + depth * y_step
 
     if not children:
-        node['x'] = 68 + counter[0] * x_Step
+        # Nodo hoja: ocupa un espacio nuevo en el eje X
+        node['x'] = 75 + counter[0] * x_step
         counter[0] += 1
     else:
+        # Nodo interior: primero acomoda a todos sus descendientes
         for ch in children:
-            compute_tree_layout(ch, depth + 1, x_Step, y_step, counter)
+            compute_tree_layout(ch, depth + 1, x_step, y_step, counter)
+        # Su posición X es exactamente el centro de todos sus hijos directos
         node['x'] = (children[0]['x'] + children[-1]['x']) / 2.0
 
     return counter[0]
 
 
 def get_max_depth(node):
+    """Calcula la profundidad máxima del árbol recursivamente."""
     children = node.get('children', [])
     if not children:
         return node.get('depth', 0)
@@ -38,6 +48,7 @@ def get_max_depth(node):
 
 
 def tree_to_parentheses(node):
+    """Representación textual anidada (Notación LISP)."""
     lbl = node.get('label', '')
     sub = node.get('sub', '')
     head = f"{lbl}:{sub}" if sub else lbl
@@ -49,13 +60,18 @@ def tree_to_parentheses(node):
 
 
 def render_real_tree_svg(root, tree_kind="syntactic"):
-    x_step = 112
-    y_step = 78
+    """
+    Renderiza el SVG usando un lienzo cuyo tamaño (ancho y alto) se ajusta 
+    dinámicamente a la cantidad de hojas y a la profundidad máxima real.
+    """
+    x_step = 130
+    y_step = 85
     leaf_count = compute_tree_layout(root, 0, x_step, y_step)
     max_depth = get_max_depth(root)
 
+    # El lienzo se adapta al tamaño real del árbol (para admitir anidamiento JSON infinito)
     width = max(560, int(leaf_count * x_step + 90))
-    height = max(210, int((max_depth + 1) * y_step + 55))
+    height = max(240, int((max_depth + 1) * y_step + 60))
 
     if tree_kind == "syntactic":
         root_fill, root_stroke = "#fef3c7", "#b45309"
@@ -72,6 +88,8 @@ def render_real_tree_svg(root, tree_kind="syntactic"):
     def traverse(n, is_root=False):
         children = n.get('children', [])
         x, y = n['x'], n['y']
+        
+        # Dibujar aristas (líneas conectoras) hacia los hijos
         for ch in children:
             cx, cy = ch['x'], ch['y']
             edges_svg.append(
@@ -80,6 +98,7 @@ def render_real_tree_svg(root, tree_kind="syntactic"):
             )
             traverse(ch, is_root=False)
 
+        # Dibujar nodo actual
         if is_root:
             fill, stroke = root_fill, root_stroke
             role_tag = "Raíz (Nivel 1)"
@@ -93,7 +112,8 @@ def render_real_tree_svg(root, tree_kind="syntactic"):
         lbl = escape_svg_text(n.get('label', ''))
         sub = escape_svg_text(n.get('sub', ''))
 
-        box_w = max(88, max(len(lbl), len(sub)) * 6.8 + 20)
+        # Calcular ancho del rectángulo dinámicamente según la longitud del texto
+        box_w = max(90, max(len(lbl), len(sub)) * 7.2 + 24)
         box_h = 38 if sub else 28
 
         nodes_svg.append(
@@ -116,7 +136,7 @@ def render_real_tree_svg(root, tree_kind="syntactic"):
             )
 
         nodes_svg.append(
-            f'<text x="{x:.1f}" y="{y - box_h/2 - 5:.1f}" text-anchor="middle" font-family="Arial, sans-serif" '
+            f'<text x="{x:.1f}" y="{y - box_h/2 - 6:.1f}" text-anchor="middle" font-family="Arial, sans-serif" '
             f'font-size="8.5" fill="#64748b">{role_tag}</text>'
         )
 
@@ -138,11 +158,6 @@ def render_real_tree_svg(root, tree_kind="syntactic"):
 
 
 def build_token_real_trees(tok_type, val):
-    """
-    M-12, B-13 y B-14:
-    Construye el Árbol Sintáctico y Semántico con formato :02d en minutos/segundos (32:05),
-    validación real contra catálogo taxonómico de EVENT_TYPE y rango entero unificado [0..10^9].
-    """
     if tok_type == 'TIMESTAMP':
         core = val[:19]
         extra_tz = val[19:]
@@ -154,26 +169,25 @@ def build_token_real_trees(tok_type, val):
 
         errors_ts = []
         if extra_tz:
-            errors_ts.append(f"Zona horaria o fracción '{extra_tz}' fuera del alcance UTC local sin sufijo")
+            errors_ts.append(f"Zona horaria '{extra_tz}' fuera del alcance UTC")
         if not (1970 <= y_int <= 2100):
             errors_ts.append(f"Año fuera de rango ({y_int})")
         if not (1 <= m_int <= 12):
-            errors_ts.append(f"Mes inválido ({m_int:02d}; rango 01..12)")
+            errors_ts.append(f"Mes inválido ({m_int:02d})")
             max_day = 31
         else:
             max_day = calendar.monthrange(y_int, m_int)[1]
             if not (1 <= d_int <= max_day):
-                bisiesto_str = "bisiesto" if calendar.isleap(y_int) else "no bisiesto"
-                errors_ts.append(f"Día inválido ({d_int:02d}) para mes {m_int:02d}/{y_int} ({bisiesto_str}, máx {max_day})")
+                errors_ts.append(f"Día inválido ({d_int:02d}) para mes {m_int:02d}/{y_int} (máx {max_day})")
         if not (0 <= hh_int <= 23):
-            errors_ts.append(f"Hora inválida ({hh_int:02d}; rango 00..23)")
+            errors_ts.append(f"Hora inválida ({hh_int:02d})")
         if not (0 <= mm_int <= 59):
-            errors_ts.append(f"Minuto inválido ({mm_int:02d}; rango 00..59)")
+            errors_ts.append(f"Minuto inválido ({mm_int:02d})")
         if not (0 <= ss_int <= 59):
-            errors_ts.append(f"Segundo inválido ({ss_int:02d}; rango 00..59)")
+            errors_ts.append(f"Segundo inválido ({ss_int:02d})")
 
         sem_ok = len(errors_ts) == 0
-        sem_msg = "Fecha/hora ISO-8601 válida en calendario" if sem_ok else " | ".join(errors_ts)
+        sem_msg = "Fecha/hora ISO-8601 válida" if sem_ok else " | ".join(errors_ts)
 
         syn_tree = {
             'label': 'TIMESTAMP',
@@ -195,7 +209,6 @@ def build_token_real_trees(tok_type, val):
                 ]}
             ]
         }
-        # B-13: Formato :02d para mostrar 32:05 en lugar de 32:5
         sem_tree = {
             'label': 'TIMESTAMP.sem',
             'sub': 'Calendario OK' if sem_ok else 'ERROR CALENDARIO',
@@ -218,20 +231,20 @@ def build_token_real_trees(tok_type, val):
 
         for idx, p in enumerate(parts, start=1):
             if len(p) > 1 and p.startswith('0'):
-                oct_errors.append(f"Octeto #{idx} ({p}) con cero inicial prohibido")
+                oct_errors.append(f"Octeto #{idx} ({p}) cero inicial prohibido")
                 oct_ok = False
             else:
                 v_int = int(p)
                 oct_ok = (0 <= v_int <= 255)
                 if not oct_ok:
-                    oct_errors.append(f"Octeto #{idx} ({v_int}) fuera de rango [0..255]")
+                    oct_errors.append(f"Octeto #{idx} ({v_int}) fuera de rango")
             oct_nodes_sem.append({
                 'label': f'Octeto {idx}',
                 'sub': f"{p} ({'0..255 OK' if oct_ok else 'INVÁLIDO'})"
             })
 
         sem_ok = (len(parts) == 4) and (len(oct_errors) == 0)
-        sem_msg = "IPv4 válida (octetos en 0..255)" if sem_ok else " | ".join(oct_errors)
+        sem_msg = "IPv4 válida" if sem_ok else " | ".join(oct_errors)
 
         syn_tree = {
             'label': 'IP',
@@ -247,7 +260,7 @@ def build_token_real_trees(tok_type, val):
         }
         sem_tree = {
             'label': 'IP.sem',
-            'sub': 'IPv4 VÁLIDA' if sem_ok else 'ERROR RANGO IPv4',
+            'sub': 'IPv4 VÁLIDA' if sem_ok else 'ERROR IPv4',
             'children': oct_nodes_sem
         }
 
@@ -273,7 +286,6 @@ def build_token_real_trees(tok_type, val):
         }
 
     elif tok_type == 'EVENT_TYPE':
-        # B-14: Consulta real al catálogo taxonómico del SOC (rechaza FOO_BAR semánticamente)
         parts = val.split('_')
         catalog_desc = grammar_ref.VALID_SOC_EVENTS.get(val)
         if catalog_desc:
@@ -281,7 +293,7 @@ def build_token_real_trees(tok_type, val):
             sem_msg = f"Catálogo SOC: {catalog_desc}"
         else:
             sem_ok = False
-            sem_msg = f"Evento {val!r} no registrado en el catálogo taxonómico SOC (SBS 504-2021)"
+            sem_msg = f"Evento {val!r} no registrado en SBS 504-2021"
 
         syn_tree = {
             'label': 'EVENT_TYPE',
@@ -303,7 +315,7 @@ def build_token_real_trees(tok_type, val):
 
         if has_ctrl:
             sem_ok = False
-            sem_msg = "Contiene caracteres de control ASCII no permitidos"
+            sem_msg = "Caracteres de control no permitidos"
         elif match_susp:
             sem_ok = False
             sem_msg = f"Entrada sospechosa detectada ({match_susp.group(0)!r})"
@@ -329,15 +341,14 @@ def build_token_real_trees(tok_type, val):
         }
 
     elif tok_type == 'NUMBER':
-        # M-12: Criterio único entero sin signo en rango [0..10^9]
         if len(val) > 1 and val.startswith('0'):
             sem_ok = False
-            sem_msg = f"Cero a la izquierda prohibido en JSON ({val})"
+            sem_msg = f"Cero a la izquierda prohibido ({val})"
             num_val = val
         else:
             num_val = int(val)
             sem_ok = (0 <= num_val <= 10**9)
-            sem_msg = f"Entero válido en rango [0..10^9] ({num_val})" if sem_ok else f"Entero fuera de rango [0..10^9] ({num_val})"
+            sem_msg = f"Entero válido [0..10^9]" if sem_ok else f"Entero fuera de rango ({num_val})"
 
         syn_tree = {'label': 'NUMBER', 'children': [{'label': 'ENTERO_JSON', 'sub': val}]}
         sem_tree = {

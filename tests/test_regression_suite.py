@@ -92,11 +92,15 @@ class TestSOCAnalyzerRegressionSuite(unittest.TestCase):
         self.assertEqual(res_big['status'], 'ERROR SEMÁNTICO')
 
     # 14. PAYLOAD {"user":"admin", "ctx":{"port":22}} -> Aceptar y preservar jerarquía en árbol semántico (F-20)
+    # 14. PAYLOAD {"user":"admin", "ctx":{"port":22}} -> Aceptar y preservar jerarquía en árbol semántico (F-20)
+   # 14. PAYLOAD {"user":"admin", "ctx":{"port":22}} -> Aceptar y preservar jerarquía en árbol semántico (F-20)
     def test_14_nested_payload_preserves_semantic_hierarchy(self):
         res = analyze_single_log('2026-09-20T14:32:05 10.0.0.1 INFO LOGIN_FAILED {"user":"admin","ctx":{"port":22}}')
         self.assertTrue(res['is_valid'])
-        self.assertIn('ObjetoJSON', res['general_sem_svg'])
-        self.assertIn('"port"', res['general_sem_svg'])
+        self.assertIn('>ObjetoJSON<', res['general_sem_svg'])
+        # Las comillas están escapadas por escape_svg_text en la vista
+        self.assertIn('>&quot;port&quot;<', res['general_sem_svg'])
+        self.assertIn('>Int(22)<', res['general_sem_svg'])
 
     # 15. Archivo de extensión no permitida -> Rechazar sin generar reporte alternativo (F-07)
     def test_15_invalid_file_extension_cancels_analysis(self):
