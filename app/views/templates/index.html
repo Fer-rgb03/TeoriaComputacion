@@ -8,10 +8,10 @@
     <script>
         function loadSample(type) {
             const samples = {
-                'valido': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3}\n2028-02-29T08:15:30 10.0.0.5 CRITICAL PRIVILEGE_ESCALATION {"user":"usr\\"admin","ctx":{"port":22}}',
+                'valido': '2026-10-17T08:43:29 172.16.25.104 ERROR LOGIN_FAILED {"user":"security_admin","attempts":5}\n2028-07-14T19:26:08 10.45.8.230 INFO PRIVILEGE_ESCALATION {"user":"operator","attempts":1}',
                 'lexico': '2026-09-20T14:32:05 192.168.1.10 @ ERROR LOGIN_FAILED {"user":"admin"}\n2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":007}',
                 'sintactico': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin","attempts":3',
-                'semantico': '2026-02-29T14:32:05 256.1.1.1 ERROR FOO_BAR {"user":"admin","attempts":3}\n2026-04-31T14:32:05 010.001.001.001 WARNING LOGIN_FAILED {"user":"admin"}',
+                'semantico': '2027-02-29T12:35:42 192.168.50.12 ERROR LOGIN_FAILED {"user":"admin","attempts":3}\n2026-04-31T14:32:05 010.001.001.001 WARNING FOO_BAR {"user":"admin"}',
                 'seguridad': '2026-09-20T14:32:05 192.168.1.10 ERROR LOGIN_FAILED {"user":"admin\'); DROP TABLE logs;--","attempts":3}'
             };
             document.getElementById('log_input').value = samples[type];
@@ -25,12 +25,22 @@
             });
             document.getElementById(tabId).classList.remove('hidden');
             const activeBtn = document.getElementById('btn-' + tabId);
-            activeBtn.classList.add('border-emerald-500', 'text-emerald-400', 'bg-slate-800/90');
-            activeBtn.classList.remove('border-transparent', 'text-slate-400');
+            if (activeBtn) {
+                activeBtn.classList.add('border-emerald-500', 'text-emerald-400', 'bg-slate-800/90');
+                activeBtn.classList.remove('border-transparent', 'text-slate-400');
+            }
         }
 
-        function jumpToAutomaton(tokType) {
+        function jumpToAutomaton(tokType, tokenUid) {
             switchMainTab('tab-catalogo-jflap');
+            if (tokenUid && window.SOCSimulator) {
+                window.SOCSimulator.selectTokenByUid(tokenUid);
+                const simPanel = document.getElementById('sec-simulacion-dinamica-lexema');
+                if (simPanel) {
+                    simPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                return;
+            }
             const detailEl = document.getElementById('cat-' + tokType);
             if (detailEl) {
                 detailEl.open = true;
@@ -51,8 +61,8 @@
                 </div>
             </div>
             <div class="flex gap-2 text-xs">
-                <span class="px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600 text-amber-200 font-semibold">AFD = ER Exacto &amp; Thompson AFND (.JFF)</span>
-                <span class="px-3 py-1 rounded-full bg-sky-950/80 border border-sky-600 text-sky-200 font-semibold">Reportes Aislados por Sesión</span>
+                <span class="px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600 text-amber-200 font-semibold">AFD = Subconjuntos &amp; Thompson AFND (.JFF)</span>
+                <span class="px-3 py-1 rounded-full bg-sky-950/80 border border-sky-600 text-sky-200 font-semibold">Simulación Dinámica Paso a Paso</span>
             </div>
         </div>
     </header>
@@ -79,9 +89,6 @@
 
         <!-- RESUMEN EJECUTIVO Y VALOR DE NEGOCIO -->
         <section class="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-lg relative overflow-hidden">
-            <div class="absolute -right-10 -top-10 opacity-10 pointer-events-none">
-                <svg width="200" height="200" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-            </div>
             <div class="mb-5 border-b border-slate-600 pb-4 relative z-10">
                 <span class="inline-block rounded-full bg-emerald-900/50 px-3 py-1 text-[11px] font-bold text-emerald-400 uppercase tracking-wide border border-emerald-700/50">
                     Visión Ejecutiva y Ciberseguridad Defensiva
@@ -93,29 +100,26 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-slate-300 leading-relaxed relative z-10">
                 <div class="space-y-2">
                     <div class="flex items-center gap-2 text-sky-400 font-bold text-base">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-                        1. ¿Qué hace el sistema?
+                        <span>1. ¿Qué hace el sistema?</span>
                     </div>
                     <p>
-                        Actúa como un <strong>Gateway Pre-SIEM de Validación Formal</strong>. Utiliza Autómatas Finitos Deterministas (AFD) y Autómatas de Pila para inspeccionar y tokenizar logs de seguridad en tiempo lineal estricto <code>O(n)</code>, antes de que ingresen a la infraestructura analítica central (Data Lake o SIEM) de la organización.
+                        Actúa como un <strong>Gateway Pre-SIEM de Validación Formal</strong>. Utiliza Autómatas Finitos Deterministas (AFD), No Deterministas (AFND de Thompson) y Autómatas de Pila para inspeccionar y tokenizar logs de seguridad en tiempo lineal estricto <code>O(n)</code>.
                     </p>
                 </div>
                 <div class="space-y-2">
                     <div class="flex items-center gap-2 text-rose-400 font-bold text-base">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                        2. ¿Qué problema resuelve?
+                        <span>2. ¿Qué problema resuelve?</span>
                     </div>
                     <p>
-                        Bloquea <strong>vectores de inyección (SQLi, NoSQLi)</strong> y logs corruptos o falsificados que imitan formatos legítimos para envenenar la base de datos. Elimina la <strong>fatiga de alertas</strong> del analista SOC al aislar en cuarentena la "basura", garantizando que los tableros de monitoreo reflejen únicamente incidentes estructurados y reales.
+                        Bloquea <strong>vectores de inyección (SQLi, NoSQLi)</strong> y logs corruptos o con fechas inexistentes antes de que contaminen la base de datos analítica, reduciendo la fatiga de alertas del analista SOC.
                     </p>
                 </div>
                 <div class="space-y-2">
                     <div class="flex items-center gap-2 text-amber-400 font-bold text-base">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                        3. ¿Qué facilita a la empresa?
+                        <span>3. ¿Qué facilita a la empresa?</span>
                     </div>
                     <p>
-                        <strong>Ahorra miles de dólares</strong> mensuales en costos de ingesta (licencias SIEM por GB procesado). Estandariza el cumplimiento normativo validando contra la taxonomía SBS 504-2021, y sella criptográficamente cada registro válido con <strong>HMAC-SHA256</strong> para brindar al <em>Blue Team</em> auditorías invulnerables al repudio.
+                        Optimiza costos de ingesta SIEM, estandariza el cumplimiento normativo validando contra la taxonomía SBS 504-2021 y sella criptográficamente cada registro válido con <strong>HMAC-SHA256</strong>.
                     </p>
                 </div>
             </div>
@@ -155,21 +159,21 @@
             <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
               <h3 class="font-bold text-slate-900 mb-1">1. Equivalencia ER ↔ AFND ↔ AFD</h3>
               <p>
-                Cada categoría léxica se define sobre el alfabeto global <code>Σ_ASCII</code> (usando <code>∖</code> para diferencia de conjuntos y <code>q_ini = q0</code>). El AFD de <code>TIMESTAMP</code> bifurca decenas de mes (<code>01..12</code>), día (<code>01..31</code>) y hora (<code>00..23</code>) en coincidencia exacta con su ER, delegando años bisiestos y días por mes (30/31) a la fase semántica.
+                Cada categoría léxica se compila desde su ER mediante Construcción de Thompson (AFND-ε) y Construcción por Subconjuntos (AFD completo sobre <code>Σ_ASCII</code> con estado trampa <code>qT</code>).
               </p>
             </div>
 
             <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
               <h3 class="font-bold text-slate-900 mb-1">2. Subconjunto "JSON Simplificado SOC"</h3>
               <p>
-                La GLC modela objetos clave-valor planos o anidados con terminales <code>LBRACE</code>, <code>RBRACE</code>, <code>COLON</code>, <code>COMMA</code>, <code>STRING</code> (con escapes <code>\" \\ \/ \b \f \n \r \t</code>) y <code>NUMBER</code> restringido a enteros sin signo <code>0|[1-9][0-9]*</code> en rango <code>[0..10^9]</code> (rechaza ceros iniciales como <code>007</code>). Quedan fuera del alcance arrays <code>[]</code>, booleanos, <code>null</code>, flotantes, IPv6 y husos horarios (<code>Z/+00:00</code>).
+                La GLC modela objetos clave-valor con terminales <code>LBRACE</code>, <code>RBRACE</code>, <code>COLON</code>, <code>COMMA</code>, <code>STRING</code> y <code>NUMBER</code> restringido a enteros sin signo <code>0|[1-9][0-9]*</code> en <code>[0..10^9]</code>.
               </p>
             </div>
 
             <div class="rounded-lg bg-emerald-50/70 p-3.5 border border-emerald-300">
               <h3 class="font-bold text-emerald-950 mb-1">3. Aislamiento de Sesión y Clave HMAC</h3>
               <p class="text-emerald-900">
-                Los archivos exportados se aíslan mediante un identificador único de sesión para evitar la sobrescritura accidental y el acceso cruzado entre usuarios. Los registros aceptados incluyen una huella <strong>HMAC-SHA256 de 64 caracteres</strong> cuya clave secreta se administra vía variable de entorno del servidor (<code>SOC_HMAC_SECRET_KEY</code>).
+                Los reportes se aíslan por sesión y los registros válidos incluyen huella <strong>HMAC-SHA256 de 64 caracteres</strong> verificada contra almacenamiento en disco.
               </p>
             </div>
           </div>
@@ -185,10 +189,10 @@
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" onclick="loadSample('valido')" class="text-xs px-3 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 transition">Válidos (Bisiesto 2028 + Escape)</button>
+                    <button type="button" onclick="loadSample('valido')" class="text-xs px-3 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 transition">Casos 1 y 2 (ERROR e INFO Válidos)</button>
+                    <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Caso 3 (2027-02-29 Semántico)</button>
                     <button type="button" onclick="loadSample('lexico')" class="text-xs px-3 py-1.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700 transition">Error Léxico (@ y 007)</button>
                     <button type="button" onclick="loadSample('sintactico')" class="text-xs px-3 py-1.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 transition">Error Sintáctico (Falta , o })</button>
-                    <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Error Semántico (2026-02-29 / FOO_BAR / IP 010)</button>
                     <button type="button" onclick="loadSample('seguridad')" class="text-xs px-3 py-1.5 rounded bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 transition">Alerta Patrón Sospechoso</button>
                 </div>
             </div>
@@ -206,7 +210,7 @@
                     </div>
                     <button type="submit"
                         class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg transition">
-                        Analizar Logs y Generar Reportes de Sesión
+                        Analizar Logs y Actualizar Simulación Dinámica
                     </button>
                 </div>
             </form>
@@ -242,7 +246,7 @@
             </button>
             <button id="btn-tab-catalogo-jflap" onclick="switchMainTab('tab-catalogo-jflap')"
                 class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
-                2. Catálogo Maestro de Autómatas JFLAP 7.1 (AFD, AFND Thompson, Subconjuntos y .JFF)
+                2. Simulación Dinámica del Lexema Actual &amp; Catálogo Maestro JFLAP 7.1
             </button>
             <button id="btn-tab-arboles-gen" onclick="switchMainTab('tab-arboles-gen')"
                 class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
@@ -284,7 +288,6 @@
                     </div>
                     {% endif %}
 
-                    <!-- TABLA DE TOKENS CON TRAZA EN VIVO Y ENLACE AL CATÁLOGO DE AUTÓMATAS -->
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse text-xs">
                             <thead>
@@ -295,11 +298,12 @@
                                     <th class="p-2.5 border border-slate-700">Lexema</th>
                                     <th class="p-2.5 border border-slate-700">Traza Real de Simulación (AFD / AFND)</th>
                                     <th class="p-2.5 border border-slate-700">Estado Semántico</th>
-                                    <th class="p-2.5 border border-slate-700">Autómata JFLAP</th>
+                                    <th class="p-2.5 border border-slate-700">Simulador Paso a Paso</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-800">
                                 {% for tok in res.tokens %}
+                                {% set t_uid = 'L' ~ tok.line ~ '_T' ~ tok.index %}
                                 <tr class="{% if tok.type == 'ERROR_LEXICO' %}bg-rose-950/60{% else %}hover:bg-slate-800/40{% endif %}">
                                     <td class="p-2.5 border border-slate-800 font-mono text-slate-400">{{ tok.index }}</td>
                                     <td class="p-2.5 border border-slate-800 font-mono text-slate-300 whitespace-nowrap">L{{ tok.line }}:C{{ tok.column }}</td>
@@ -316,14 +320,10 @@
                                         {% endif %}
                                     </td>
                                     <td class="p-2.5 border border-slate-800 text-center">
-                                        {% if tok.type != 'ERROR_LEXICO' %}
-                                        <button type="button" onclick="jumpToAutomaton('{{ tok.type }}')"
+                                        <button type="button" onclick="jumpToAutomaton('{{ tok.type }}', '{{ t_uid }}')"
                                             class="px-2.5 py-1 rounded bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 font-semibold text-[11px] border border-amber-600/60 transition whitespace-nowrap">
-                                            ☕ Ver AFD/AFND
+                                            ▶ Simular Token #{{ tok.index }}
                                         </button>
-                                        {% else %}
-                                        <span class="text-rose-400 font-mono text-[11px]">Estado qT</span>
-                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -336,15 +336,222 @@
         </div>
 
         <!-- ================================================================== -->
-        <!-- PESTAÑA 2: CATÁLOGO MAESTRO DE AUTÓMATAS (1 POR TIPO DE TOKEN)     -->
+        <!-- PESTAÑA 2: SIMULACIÓN DINÁMICA DEL LEXEMA ACTUAL & CATÁLOGO JFLAP  -->
         <!-- ================================================================== -->
-        <div id="tab-catalogo-jflap" class="main-tab-content hidden space-y-6">
+        <div id="tab-catalogo-jflap" class="main-tab-content hidden space-y-8">
+
+            <!-- SECCIÓN REQUISITO 1: SIMULACIÓN DINÁMICA DEL LEXEMA ACTUAL -->
+            <section id="sec-simulacion-dinamica-lexema" class="bg-slate-900 border-2 border-emerald-600/80 rounded-xl p-6 shadow-2xl space-y-6">
+                <div class="flex flex-wrap justify-between items-start gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <span class="inline-block px-3 py-0.5 rounded-full bg-emerald-950 border border-emerald-500 text-emerald-300 text-[11px] font-bold uppercase tracking-wide">
+                            Motor Formal Interactivo (Fase 3 — Etapa B)
+                        </span>
+                        <h3 class="text-lg font-bold text-white mt-1">
+                            Simulación dinámica del lexema actual
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            Seleccione cualquiera de los tokens extraídos del log analizado para recorrer paso a paso sus configuraciones formales en el AFD (Subconjuntos) y en el AFND (Thompson).
+                        </p>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-xs font-mono text-slate-300">
+                        Categoría Activa: <strong id="sim-active-category" class="text-amber-400">-</strong> |
+                        Lexema: <strong id="sim-active-lexeme" class="text-emerald-300">-</strong>
+                    </div>
+                </div>
+
+                {% if all_dynamic_tokens %}
+                <!-- SELECTOR DE TOKENS REALES DEL LOG ANALIZADO (REQUISITO 2 y 10) -->
+                <div class="space-y-2">
+                    <label class="text-xs font-bold uppercase text-slate-300 block">
+                        1. Seleccionar Token del Registro Analizado ({{ all_dynamic_tokens | length }} tokens disponibles):
+                    </label>
+                    <div id="sim-token-selector-bar" class="flex flex-wrap gap-2">
+                        {% for dyn in all_dynamic_tokens %}
+                        <button type="button"
+                            id="btn-tok-{{ dyn.token_uid }}"
+                            data-token-uid="{{ dyn.token_uid }}"
+                            onclick="window.SOCSimulator.selectTokenByUid('{{ dyn.token_uid }}')"
+                            class="sim-token-btn px-3 py-1.5 rounded-lg border text-xs font-mono transition flex items-center gap-1.5 bg-slate-950 border-slate-700 text-slate-300 hover:border-amber-400">
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">L{{ dyn.line }}:#{{ dyn.token_index }}</span>
+                            <strong class="text-emerald-400">{{ dyn.token_type }}</strong>
+                            <span class="text-amber-300">{{ dyn.lexeme }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- DIFERENCIACIÓN DE LOS 3 VEREDICTOS: LÉXICO, SEMÁNTICO Y GLOBAL DEL LOG (REQUISITO 9) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div id="card-verdict-lexical" class="rounded-lg border p-3.5 bg-slate-950 border-slate-800">
+                        <p class="text-[11px] uppercase font-bold text-slate-400">A. Reconocimiento Léxico (Autómata AFD/AFND)</p>
+                        <p id="sim-verdict-lexical-title" class="text-sm font-bold mt-1 font-mono">-</p>
+                        <p id="sim-verdict-lexical-detail" class="text-[11px] text-slate-300 mt-1 font-mono">-</p>
+                    </div>
+                    <div id="card-verdict-semantic" class="rounded-lg border p-3.5 bg-slate-950 border-slate-800">
+                        <p class="text-[11px] uppercase font-bold text-slate-400">B. Validación Semántica del Token</p>
+                        <p id="sim-verdict-semantic-title" class="text-sm font-bold mt-1 font-mono">-</p>
+                        <p id="sim-verdict-semantic-detail" class="text-[11px] text-slate-300 mt-1 font-mono">-</p>
+                    </div>
+                    <div id="card-verdict-global" class="rounded-lg border p-3.5 bg-slate-950 border-slate-800">
+                        <p class="text-[11px] uppercase font-bold text-slate-400">C. Resultado Global del Log (Línea Completa)</p>
+                        <p id="sim-verdict-global-title" class="text-sm font-bold mt-1 font-mono">-</p>
+                        <p id="sim-verdict-global-detail" class="text-[11px] text-slate-300 mt-1 font-mono">-</p>
+                    </div>
+                </div>
+                <!-- BANNER DE DIAGNÓSTICO EXACTO DE ERROR LÉXICO (ETAPA C - PRIORIDAD 3) -->
+                <div id="sim-error-diagnostic-banner" class="hidden rounded-lg border border-rose-500 bg-rose-950/80 p-3.5 text-xs font-mono text-rose-200 space-y-1">
+                    <div class="font-bold text-rose-400 uppercase flex items-center gap-2">
+                        <span>🚨 Detección Exacta de Fallo en el Autómata:</span>
+                        <span id="sim-error-pos-symbol" class="px-2 py-0.5 rounded bg-rose-900 text-white"></span>
+                    </div>
+                    <p id="sim-error-afd-detail"></p>
+                    <p id="sim-error-afnd-detail"></p>
+                </div>
+
+                <!-- CONTROLES DE LEGIBILIDAD VISUAL: VISTA SIMPLIFICADA/COMPLETA Y ZOOM (ETAPA C) -->
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-slate-300 uppercase">Modo de Diagrama:</span>
+                        <button type="button" id="btn-toggle-trap-view" onclick="window.SOCSimulator.toggleSimplifiedView()"
+                            class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold border border-amber-600/60 transition">
+                            👁️ Vista Completa (Con transiciones a qT)
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-slate-300 uppercase">Zoom Lienzo SVG:</span>
+                        <button type="button" id="btn-zoom-out" onclick="window.SOCSimulator.adjustZoom(-0.15)"
+                            class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700">−</button>
+                        <button type="button" id="btn-zoom-reset" onclick="window.SOCSimulator.resetZoom()"
+                            class="px-2.5 py-1 rounded bg-slate-900 text-emerald-400 font-mono font-bold border border-slate-700">100%</button>
+                        <button type="button" id="btn-zoom-in" onclick="window.SOCSimulator.adjustZoom(0.15)"
+                            class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700">+</button>
+                    </div>
+                </div>
+
+                <!-- CINTA DE ENTRADA Y CONTROLES DE NAVEGACIÓN PASO A PASO (REQUISITOS 5 y 8) -->
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" id="btn-sim-reset" onclick="window.SOCSimulator.resetStep()"
+                                class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-600 transition">
+                                ⏮ Reiniciar (Paso 0)
+                            </button>
+                            <button type="button" id="btn-sim-start" onclick="window.SOCSimulator.startSimulation()"
+                                class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-white text-xs font-bold shadow transition">
+                                ▶ Iniciar simulación
+                            </button>
+                            <button type="button" id="btn-sim-prev" onclick="window.SOCSimulator.prevStep()"
+                                class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold border border-amber-600/60 transition">
+                                ◀ Anterior
+                            </button>
+                            <button type="button" id="btn-sim-next" onclick="window.SOCSimulator.nextStep()"
+                                class="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition">
+                                Siguiente ▶
+                            </button>
+                            <button type="button" id="btn-sim-end" onclick="window.SOCSimulator.endStep()"
+                                class="px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow transition">
+                                ⏭ Resultado final
+                            </button>
+                        </div>
+                        <div class="text-xs font-mono bg-slate-900 px-3 py-1.5 rounded border border-slate-700">
+                            Paso actual: <strong id="sim-step-counter" class="text-amber-400">0 / 0</strong> |
+                            Posición de lectura: <strong id="sim-read-position" class="text-sky-400">0</strong>
+                        </div>
+                    </div>
+
+                    <!-- INDICADORES DE CINTA: CONSUMIDO, SÍMBOLO LEÍDO Y CADENA PENDIENTE -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
+                        <div class="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] uppercase text-slate-400 block">Prefijo Consumido:</span>
+                            <span id="sim-consumed-input" class="text-emerald-400 font-bold break-all">ε</span>
+                        </div>
+                        <div class="bg-slate-900 border border-amber-500/50 rounded-lg p-3">
+                            <span class="text-[10px] uppercase text-amber-300 block">▼ Símbolo Leído en este Paso:</span>
+                            <span id="sim-current-symbol" class="text-amber-300 text-sm font-bold">-</span>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] uppercase text-slate-400 block">Cadena Pendiente de Procesar:</span>
+                            <span id="sim-remaining-input" class="text-sky-300 font-bold break-all">-</span>
+                        </div>
+                    </div>
+
+                    <!-- CINTA VISUAL DE CELDAS -->
+                    <div>
+                        <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Cinta de Entrada del Autómata (Cabezal Lector):</span>
+                        <div id="sim-tape-cells" class="flex flex-wrap gap-1 font-mono text-xs"></div>
+                    </div>
+                </div>
+
+                <!-- PANELES DE ESTADO ACTIVO AFD (ÚNICO) Y AFND (CONJUNTO + EPSILON-CLAUSURA) (REQUISITOS 4, 6 y 7) -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- RESUMEN PASO ACTUAL AFD -->
+                    <div class="bg-slate-950 border border-amber-600/60 rounded-xl p-4 space-y-2 text-xs font-mono">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span class="font-bold text-amber-400 uppercase">Recorrido AFD (Un Único Estado Activo por Paso)</span>
+                            <span id="sim-afd-step-status" class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 text-[11px]">-</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <div>Estado Inicial (<code>q_ini</code>): <strong id="sim-afd-init-state" class="text-white">q0</strong></div>
+                            <div>Estado Activo Actual: <strong id="sim-afd-active-state" class="text-emerald-400 text-sm">-</strong></div>
+                            <div>Estados Finales (<code>F</code>): <span id="sim-afd-finals-def" class="text-slate-300">-</span></div>
+                            <div>Transición Utilizada: <strong id="sim-afd-transition-used" class="text-sky-300">-</strong></div>
+                        </div>
+                        <div class="bg-slate-900 p-2.5 rounded border border-slate-800 text-[11px] text-slate-200">
+                            <strong>Regla Formal AFD:</strong> <span id="sim-afd-rule-text">-</span>
+                        </div>
+                    </div>
+
+                    <!-- RESUMEN PASO ACTUAL AFND -->
+                    <div class="bg-slate-950 border border-sky-600/60 rounded-xl p-4 space-y-2 text-xs font-mono">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span class="font-bold text-sky-400 uppercase">Recorrido AFND Thompson (Conjunto Activo y ε-Clausuras)</span>
+                            <span id="sim-afnd-step-status" class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 text-[11px]">-</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <div>Clausura Inicial: <strong id="sim-afnd-init-set" class="text-white">-</strong></div>
+                            <div>Conjunto Activo (<code>ε-clausura</code>): <strong id="sim-afnd-active-set" class="text-emerald-400 text-sm">-</strong></div>
+                            <div>Conjunto <code>move(S, a)</code>: <span id="sim-afnd-move-set" class="text-amber-300">-</span></div>
+                            <div>Aristas <code>ε</code> usadas: <span id="sim-afnd-eps-edges" class="text-purple-300">-</span></div>
+                        </div>
+                        <div class="bg-slate-900 p-2.5 rounded border border-slate-800 text-[11px] text-slate-200">
+                            <strong>Regla Formal AFND:</strong> <span id="sim-afnd-rule-text">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTENEDOR DINÁMICO DONDE SE MUESTRAN E ILUMINAN LOS DIAGRAMAS SVG DEL TOKEN SELECCIONADO -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="rounded-lg overflow-hidden border-2 border-amber-500/80 shadow-xl bg-slate-950">
+                        <div class="bg-amber-400 text-slate-950 px-3 py-2 flex justify-between items-center text-xs font-bold">
+                            <span>🔍 Vista Interactiva AFD — Estado Activo y Transición Resaltados</span>
+                            <span id="sim-viewport-afd-badge" class="font-mono text-[11px] bg-slate-900 text-amber-300 px-2 py-0.5 rounded">AFD</span>
+                        </div>
+                        <div id="sim-afd-svg-viewport" class="p-2 bg-white text-slate-900"></div>
+                    </div>
+
+                    <div class="rounded-lg overflow-hidden border-2 border-sky-500/80 shadow-xl bg-slate-950">
+                        <div class="bg-sky-400 text-slate-950 px-3 py-2 flex justify-between items-center text-xs font-bold">
+                            <span>🔍 Vista Interactiva AFND (Thompson) — Conjunto Activo y ε-Clausuras</span>
+                            <span id="sim-viewport-afnd-badge" class="font-mono text-[11px] bg-slate-900 text-sky-300 px-2 py-0.5 rounded">AFND</span>
+                        </div>
+                        <div id="sim-afnd-svg-viewport" class="p-2 bg-white text-slate-900"></div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="bg-slate-950 border border-slate-800 rounded-lg p-4 text-xs text-slate-400">
+                    No hay tokens activos para simular. Ingrese un registro de log y presione "Analizar Logs".
+                </div>
+                {% endif %}
+            </section>
+
+            <!-- CATÁLOGO MAESTRO DE AUTÓMATAS POR CATEGORÍA LÉXICA (REQUISITO 11) -->
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
                 <h3 class="text-base font-bold text-amber-400">
-                    Catálogo Maestro de Autómatas Finitos por Categoría Léxica (H-04: Referencia Única Desacoplada)
+                    Catálogo Maestro de Autómatas Finitos por Categoría Léxica (Referencia Formal y Casos de Demostración)
                 </h3>
                 <p class="text-xs text-slate-300 mt-1">
-                    Cada categoría léxica presenta su definición formal sin ambigüedades (<code>q_ini = q0</code>), su AFD completo con estado trampa <code>qT</code>, su AFND derivado por Construcción de Thompson, la relación de equivalencia por Construcción de Subconjuntos (<code>λ-clausura</code>) y la exportación directa a <code>.jff</code> para JFLAP 7.1.
+                    Cada categoría conserva su definición formal (<code>q_ini = q0</code>), su AFD por Construcción de Subconjuntos, su AFND por Construcción de Thompson, su exportación <code>.jff</code> para JFLAP 7.1, los lexemas reales analizados en esa categoría y la tabla de <strong>«Casos de demostración»</strong>.
                 </p>
             </div>
 
@@ -361,7 +568,7 @@
                 <div class="p-6 space-y-6 border-t border-slate-800">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <!-- VENTANA JFLAP AFD -->
-                        <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
+                        <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg" id="master-afd-box-{{ tok_type }}">
                             <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
                                 <span>☕ JFLAP 7.1 — AFD (Determinista) para {{ tok_type }}</span>
                                 <span class="font-mono text-[11px] bg-amber-200 px-2 py-0.5 rounded border border-amber-500">{{ cat.quintupla_afd.delta }}</span>
@@ -369,11 +576,13 @@
                             <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
                                 Q = {{ cat.quintupla_afd.Q }} | {{ cat.quintupla_afd.Sigma }} | q_ini = {{ cat.quintupla_afd.q_ini }} | F = {{ cat.quintupla_afd.F }}
                             </div>
-                            {{ cat.jflap_afd_svg | safe }}
+                            <div id="master-afd-svg-{{ tok_type }}">
+                                {{ cat.jflap_afd_svg | safe }}
+                            </div>
                         </div>
 
                         <!-- VENTANA JFLAP AFND -->
-                        <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg">
+                        <div class="rounded-lg overflow-hidden border border-slate-600 shadow-lg" id="master-afnd-box-{{ tok_type }}">
                             <div class="bg-slate-200 text-slate-900 px-3 py-1.5 flex justify-between items-center text-xs font-bold border-b border-slate-400">
                                 <span>☕ JFLAP 7.1 — AFND (Construcción de Thompson) para {{ tok_type }}</span>
                                 <span class="font-mono text-[11px] bg-sky-200 px-2 py-0.5 rounded border border-sky-500">{{ cat.quintupla_afnd.delta }}</span>
@@ -381,21 +590,73 @@
                             <div class="bg-slate-100 text-slate-700 px-3 py-1 text-[11px] border-b border-slate-300 font-mono">
                                 Q' = {{ cat.quintupla_afnd.Q }} | {{ cat.quintupla_afnd.Sigma }} | q_ini = {{ cat.quintupla_afnd.q_ini }} | F' = {{ cat.quintupla_afnd.F }}
                             </div>
-                            {{ cat.jflap_afnd_svg | safe }}
+                            <div id="master-afnd-svg-{{ tok_type }}">
+                                {{ cat.jflap_afnd_svg | safe }}
+                            </div>
                         </div>
                     </div>
 
+                    <!-- SUBSECCIÓN A: LEXEMAS REALES DEL ANÁLISIS ACTUAL EN ESTA CATEGORÍA -->
+                    {% set cat_live_list = dynamic_lexemes_by_type.get(tok_type, []) %}
+                    <div class="bg-slate-950 border border-emerald-700/70 rounded-lg p-4">
+                        <h4 class="text-xs font-bold text-emerald-400 uppercase mb-2">
+                            Simulación del lexema actual en {{ tok_type }} (Extraído de los Logs Analizados: {{ cat_live_list | length }} ocurrencia(s))
+                        </h4>
+                        {% if cat_live_list %}
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-800 text-slate-200">
+                                    <th class="p-2 border border-slate-700">Posición</th>
+                                    <th class="p-2 border border-slate-700">Lexema Real Analizado</th>
+                                    <th class="p-2 border border-slate-700">Resultado Léxico (AFD/AFND)</th>
+                                    <th class="p-2 border border-slate-700">Validación Semántica</th>
+                                    <th class="p-2 border border-slate-700">Traza Ejecutada en el Motor Formal</th>
+                                    <th class="p-2 border border-slate-700">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in cat_live_list %}
+                                <tr>
+                                    <td class="p-2 border border-slate-800 font-mono text-slate-400">L{{ item.line }}:C{{ item.column }} (#{{ item.token_index }})</td>
+                                    <td class="p-2 border border-slate-800 font-mono text-amber-300 font-bold">{{ item.lexeme }}</td>
+                                    <td class="p-2 border border-slate-800 font-bold {% if item.lexical_accepted %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                                        {{ item.afd.result }} (Final: {{ item.afd.final_states_reached | join(', ') }})
+                                    </td>
+                                    <td class="p-2 border border-slate-800 {% if item.semantic_accepted %}text-emerald-300{% else %}text-rose-300{% endif %}">
+                                        {% if item.semantic_accepted %}✔ {{ item.semantic_message }}{% else %}✖ {{ item.semantic_message }}{% endif %}
+                                    </td>
+                                    <td class="p-2 border border-slate-800 font-mono text-[11px] text-slate-300">
+                                        {{ item.afd.summary_text }} || {{ item.afnd.summary_text }}
+                                    </td>
+                                    <td class="p-2 border border-slate-800 text-center">
+                                        <button type="button" onclick="jumpToAutomaton('{{ tok_type }}', '{{ item.token_uid }}')"
+                                            class="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] transition">
+                                            ▶ Cargar en Simulador
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-xs text-slate-400 font-mono">No se registraron tokens de tipo {{ tok_type }} en el lote actual.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- SUBSECCIÓN B: CASOS DE DEMOSTRACIÓN PREDEFINIDOS (REQUISITO 10 y 11) -->
                     <div class="bg-slate-950 border border-slate-800 rounded-lg p-4">
                         <p class="text-xs font-mono text-sky-300 mb-2">
                             <strong>Equivalencia AFND → AFD (Construcción de Subconjuntos de Rabin-Scott):</strong> {{ cat.subset_info }}
                         </p>
-                        <h4 class="text-xs font-bold text-amber-300 uppercase mb-2">Simulación Dinámica JFLAP: Input → Multiple Run ({{ tok_type }})</h4>
+                        <h4 class="text-xs font-bold text-amber-300 uppercase mb-2">
+                            Casos de demostración — Banco de Referencia JFLAP ({{ tok_type }})
+                        </h4>
                         <table class="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr class="bg-slate-800 text-slate-300">
-                                    <th class="p-2 border border-slate-700">Input (Cadena Evaluada)</th>
+                                    <th class="p-2 border border-slate-700">Input de Demostración</th>
                                     <th class="p-2 border border-slate-700">Result (JFLAP 7.1)</th>
-                                    <th class="p-2 border border-slate-700">Traza Ejecutada sobre el AFD y el AFND</th>
+                                    <th class="p-2 border border-slate-700">Traza de Referencia (AFD y AFND)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -466,5 +727,360 @@
         </div>
 
     </main>
+
+    <!-- DATOS FORMALES ESTRUCTURADOS INYECTADOS DESDE PYTHON (SIN MOTOR JS PARALELO) -->
+    <script id="soc-dynamic-tokens-data" type="application/json">
+        {{ all_dynamic_tokens | tojson }}
+    </script>
+
+    <script>
+        window.SOCSimulator = (function() {
+            const rawDataEl = document.getElementById('soc-dynamic-tokens-data');
+            const tokenList = rawDataEl ? JSON.parse(rawDataEl.textContent || '[]') : [];
+            const tokenMap = {};
+            tokenList.forEach(item => { tokenMap[item.token_uid] = item; });
+
+            let currentToken = tokenList.length > 0 ? tokenList[0] : null;
+            let currentStepIndex = 0;
+            let simplifiedView = false;
+            let currentZoom = 1.0;
+
+            function loadDiagramTemplatesForCategory(cat) {
+                const srcAfd = document.getElementById('master-afd-svg-' + cat);
+                const srcAfnd = document.getElementById('master-afnd-svg-' + cat);
+                const dstAfd = document.getElementById('sim-afd-svg-viewport');
+                const dstAfnd = document.getElementById('sim-afnd-svg-viewport');
+                if (srcAfd && dstAfd) dstAfd.innerHTML = srcAfd.innerHTML;
+                if (srcAfnd && dstAfnd) dstAfnd.innerHTML = srcAfnd.innerHTML;
+                applySimplifiedViewAndZoom();
+            }
+
+            function applySimplifiedViewAndZoom() {
+                const dstAfd = document.getElementById('sim-afd-svg-viewport');
+                const dstAfnd = document.getElementById('sim-afnd-svg-viewport');
+                [dstAfd, dstAfnd].forEach(container => {
+                    if (!container) return;
+                    container.querySelectorAll('[data-trap-element="true"]').forEach(el => {
+                        el.style.display = simplifiedView ? 'none' : '';
+                    });
+                    const svgEl = container.querySelector('svg.jflap-diagram-svg');
+                    if (svgEl) {
+                        svgEl.style.transformOrigin = 'top left';
+                        svgEl.style.width = `${Math.round(currentZoom * 100)}%`;
+                    }
+                });
+                const toggleBtn = document.getElementById('btn-toggle-trap-view');
+                if (toggleBtn) {
+                    toggleBtn.textContent = simplifiedView
+                        ? '✨ Vista Simplificada Activa (Sin aristas a qT)'
+                        : '👁️ Vista Completa (Con transiciones a qT)';
+                }
+                const zoomResetBtn = document.getElementById('btn-zoom-reset');
+                if (zoomResetBtn) {
+                    zoomResetBtn.textContent = `${Math.round(currentZoom * 100)}%`;
+                }
+            }
+
+            function resetSvgHighlights(container) {
+                if (!container) return;
+                container.querySelectorAll('circle[data-state-node]').forEach(c => {
+                    c.setAttribute('fill', c.getAttribute('data-default-fill') || '#ffff96');
+                    c.setAttribute('stroke', '#111111');
+                    c.setAttribute('stroke-width', '1.5');
+                });
+                container.querySelectorAll('.jflap-edge').forEach(e => {
+                    e.setAttribute('stroke', e.getAttribute('data-default-stroke') || '#111111');
+                    e.setAttribute('stroke-width', '1.4');
+                    e.removeAttribute('stroke-dasharray');
+                });
+                container.querySelectorAll('tr[data-state-row]').forEach(row => {
+                    row.classList.remove('ring-2', 'ring-amber-500', 'bg-amber-100');
+                });
+            }
+
+            function highlightStateNode(container, stateId, fillHex, strokeHex) {
+                if (!container || !stateId) return;
+                const node = container.querySelector(`circle[data-state-node="${stateId}"]`);
+                if (node) {
+                    node.style.display = ''; // Si qT está activo en un rechazo, mostrarlo siempre
+                    node.setAttribute('fill', fillHex);
+                    node.setAttribute('stroke', strokeHex);
+                    node.setAttribute('stroke-width', '3.5');
+                }
+                const row = container.querySelector(`tr[data-state-row="${stateId}"]`);
+                if (row) {
+                    row.classList.add('ring-2', 'ring-amber-500', 'bg-amber-100');
+                }
+            }
+
+            function highlightEdge(container, fromId, toId, labelStr, strokeHex, dashed) {
+                if (!container || !fromId || !toId) return;
+                container.querySelectorAll('.jflap-edge').forEach(edge => {
+                    if (
+                        edge.getAttribute('data-edge-from') === fromId &&
+                        edge.getAttribute('data-edge-to') === toId &&
+                        (!labelStr || edge.getAttribute('data-edge-label') === labelStr)
+                    ) {
+                        edge.style.display = '';
+                        edge.setAttribute('stroke', strokeHex);
+                        edge.setAttribute('stroke-width', '3.4');
+                        if (dashed) {
+                            edge.setAttribute('stroke-dasharray', '5,3');
+                        }
+                    }
+                });
+            }
+
+            function renderTapeCells(lexeme, pos, isErrorStep) {
+                const tapeEl = document.getElementById('sim-tape-cells');
+                if (!tapeEl) return;
+                tapeEl.innerHTML = '';
+                const chars = Array.from(lexeme || '');
+                chars.forEach((ch, idx) => {
+                    const cellPos = idx + 1;
+                    const span = document.createElement('span');
+                    let cls = 'px-2.5 py-1 rounded border font-mono text-xs ';
+                    if (cellPos < pos) {
+                        cls += 'bg-emerald-950/80 border-emerald-700 text-emerald-300';
+                    } else if (cellPos === pos) {
+                        cls += isErrorStep
+                            ? 'bg-rose-600 border-rose-300 text-white font-extrabold ring-2 ring-rose-400 scale-105'
+                            : 'bg-amber-400 border-amber-200 text-slate-950 font-extrabold ring-2 ring-amber-300 scale-105';
+                    } else {
+                        cls += 'bg-slate-900 border-slate-700 text-slate-400';
+                    }
+                    span.className = cls;
+                    span.textContent = ch === ' ' ? '␣' : ch;
+                    tapeEl.appendChild(span);
+                });
+            }
+
+            function updateNavigationButtonsState(stepIdx, maxIdx) {
+                const atStart = (stepIdx <= 0);
+                const atEnd = (stepIdx >= maxIdx);
+                const btnReset = document.getElementById('btn-sim-reset');
+                const btnPrev = document.getElementById('btn-sim-prev');
+                const btnNext = document.getElementById('btn-sim-next');
+                const btnEnd = document.getElementById('btn-sim-end');
+
+                if (btnReset) btnReset.disabled = atStart;
+                if (btnPrev) btnPrev.disabled = atStart;
+                if (btnNext) btnNext.disabled = atEnd;
+                if (btnEnd) btnEnd.disabled = atEnd;
+
+                [btnReset, btnPrev, btnNext, btnEnd].forEach(btn => {
+                    if (!btn) return;
+                    if (btn.disabled) {
+                        btn.classList.add('opacity-40', 'cursor-not-allowed');
+                    } else {
+                        btn.classList.remove('opacity-40', 'cursor-not-allowed');
+                    }
+                });
+            }
+
+            function renderCurrentStep() {
+                if (!currentToken) return;
+                const afdSteps = currentToken.afd.steps || [];
+                const afndSteps = currentToken.afnd.steps || [];
+                const total = afdSteps.length;
+                const maxIdx = Math.max(0, total - 1);
+                if (currentStepIndex < 0) currentStepIndex = 0;
+                if (currentStepIndex > maxIdx) currentStepIndex = maxIdx;
+
+                updateNavigationButtonsState(currentStepIndex, maxIdx);
+
+                const sAfd = afdSteps[currentStepIndex];
+                const sAfnd = afndSteps[Math.min(currentStepIndex, afndSteps.length - 1)];
+                const isTrapNow = Boolean(sAfd && (sAfd.is_trap || sAfd.status === 'INCOMPLETO_NO_FINAL'));
+
+                document.getElementById('sim-active-category').textContent = currentToken.automaton_category;
+                document.getElementById('sim-active-lexeme').textContent = currentToken.lexeme;
+                document.getElementById('sim-step-counter').textContent = `${currentStepIndex} / ${maxIdx}`;
+                document.getElementById('sim-read-position').textContent = sAfd ? sAfd.position : 0;
+                document.getElementById('sim-consumed-input').textContent = (sAfd && sAfd.consumed_input) ? sAfd.consumed_input : 'ε';
+                document.getElementById('sim-current-symbol').textContent = (sAfd && sAfd.symbol !== null) ? `'${sAfd.symbol}'` : 'Ninguno (Configuración Inicial)';
+                document.getElementById('sim-remaining-input').textContent = sAfd ? sAfd.remaining_input : 'ε';
+
+                renderTapeCells(currentToken.lexeme, sAfd ? sAfd.position : 0, isTrapNow);
+
+                // Banner de Diagnóstico de Error Léxico (Prioridad 3)
+                const errBanner = document.getElementById('sim-error-diagnostic-banner');
+                if (errBanner) {
+                    if (!currentToken.lexical_accepted) {
+                        errBanner.classList.remove('hidden');
+                        const errPos = currentToken.afd.error_position || '-';
+                        const errSym = currentToken.afd.error_symbol !== null && currentToken.afd.error_symbol !== undefined
+                            ? `'${currentToken.afd.error_symbol}'`
+                            : 'Fin de cadena';
+                        document.getElementById('sim-error-pos-symbol').textContent = `Posición ${errPos} | Símbolo: ${errSym}`;
+                        document.getElementById('sim-error-afd-detail').textContent = `• AFD: ${currentToken.afd.error_reason}`;
+                        document.getElementById('sim-error-afnd-detail').textContent = `• AFND: ${currentToken.afnd.error_reason}`;
+                    } else {
+                        errBanner.classList.add('hidden');
+                    }
+                }
+
+                // Tarjeta A: Reconocimiento Léxico del Token
+                const lexTitle = document.getElementById('sim-verdict-lexical-title');
+                const lexDetail = document.getElementById('sim-verdict-lexical-detail');
+                if (currentToken.lexical_accepted) {
+                    lexTitle.textContent = `✔ ACCEPT LÉXICO (${currentToken.afd.final_states_reached.join(', ')} ∈ F)`;
+                    lexTitle.className = 'text-sm font-bold mt-1 font-mono text-emerald-400';
+                    lexDetail.textContent = `AFD culmina en ${currentToken.afd.final_states_reached.join(', ')} y AFND en {${currentToken.afnd.final_states_reached.join(', ')}}.`;
+                } else {
+                    lexTitle.textContent = `✖ REJECT LÉXICO (Posición ${currentToken.afd.error_position || '-'})`;
+                    lexTitle.className = 'text-sm font-bold mt-1 font-mono text-rose-400';
+                    lexDetail.textContent = currentToken.afd.error_reason || 'Rechazado por el autómata.';
+                }
+
+                // Tarjeta B: Validación Semántica del Token
+                const semTitle = document.getElementById('sim-verdict-semantic-title');
+                const semDetail = document.getElementById('sim-verdict-semantic-detail');
+                if (currentToken.semantic_accepted) {
+                    semTitle.textContent = '✔ SEMÁNTICA DEL TOKEN VÁLIDA';
+                    semTitle.className = 'text-sm font-bold mt-1 font-mono text-emerald-400';
+                } else {
+                    semTitle.textContent = '✖ RECHAZO SEMÁNTICO DEL TOKEN';
+                    semTitle.className = 'text-sm font-bold mt-1 font-mono text-rose-400';
+                }
+                semDetail.textContent = currentToken.semantic_message || '-';
+
+                // Tarjeta C: Veredicto Global del Log con desglose de fases (Prioridad 2)
+                const globTitle = document.getElementById('sim-verdict-global-title');
+                const globDetail = document.getElementById('sim-verdict-global-detail');
+                const phaseSummary = `Fases del Log → Léxica: ${currentToken.log_valid_lexical ? 'OK' : 'FALLO'} | Sintáctica: ${currentToken.log_valid_syntactic ? 'OK' : 'FALLO'} | Semántica: ${currentToken.log_valid_semantic ? 'OK' : 'FALLO'}`;
+                if (currentToken.log_is_valid) {
+                    globTitle.textContent = `✅ LOG LÍNEA #${currentToken.line}: ${currentToken.log_status || 'VÁLIDO'}`;
+                    globTitle.className = 'text-sm font-bold mt-1 font-mono text-emerald-400';
+                    globDetail.textContent = phaseSummary;
+                } else {
+                    globTitle.textContent = `❌ LOG LÍNEA #${currentToken.line}: ${currentToken.log_status || 'RECHAZADO'}`;
+                    globTitle.className = 'text-sm font-bold mt-1 font-mono text-rose-400';
+                    const firstErr = (currentToken.log_errors && currentToken.log_errors[0]) ? ` — ${currentToken.log_errors[0]}` : '';
+                    globDetail.textContent = phaseSummary + firstErr;
+                }
+
+                // Actualizar Lienzo AFD
+                const dstAfd = document.getElementById('sim-afd-svg-viewport');
+                resetSvgHighlights(dstAfd);
+                applySimplifiedViewAndZoom();
+                if (sAfd) {
+                    document.getElementById('sim-afd-init-state').textContent = currentToken.afd.initial_state;
+                    document.getElementById('sim-afd-active-state').textContent = sAfd.active_state;
+                    document.getElementById('sim-afd-finals-def').textContent = '{' + (currentToken.afd.final_states_defined || []).join(', ') + '}';
+                    document.getElementById('sim-afd-step-status').textContent = sAfd.status;
+                    document.getElementById('sim-afd-rule-text').textContent = sAfd.rule;
+
+                    if (sAfd.transition_used) {
+                        const tr = sAfd.transition_used;
+                        document.getElementById('sim-afd-transition-used').textContent = `${tr.from} --[${tr.label}]--> ${tr.to}`;
+                        highlightEdge(dstAfd, tr.from, tr.to, tr.label, sAfd.is_trap ? '#dc2626' : '#2563eb', false);
+                    } else {
+                        document.getElementById('sim-afd-transition-used').textContent = 'Ninguna (Paso 0)';
+                    }
+                    const fillCol = sAfd.is_trap ? '#fca5a5' : (sAfd.is_final && currentStepIndex === maxIdx ? '#6ee7b7' : '#38bdf8');
+                    const strokeCol = sAfd.is_trap ? '#b91c1c' : '#0369a1';
+                    highlightStateNode(dstAfd, sAfd.active_state, fillCol, strokeCol);
+                }
+
+                // Actualizar Lienzo AFND
+                const dstAfnd = document.getElementById('sim-afnd-svg-viewport');
+                resetSvgHighlights(dstAfnd);
+                if (sAfnd) {
+                    document.getElementById('sim-afnd-init-set').textContent = '{' + (currentToken.afnd.initial_state || []).join(', ') + '}';
+                    document.getElementById('sim-afnd-active-set').textContent = sAfnd.active_states.length ? ('{' + sAfnd.active_states.join(', ') + '}') : '∅ (Sin Estados Activos)';
+                    document.getElementById('sim-afnd-move-set').textContent = sAfnd.move_states.length ? ('{' + sAfnd.move_states.join(', ') + '}') : '∅';
+                    document.getElementById('sim-afnd-step-status').textContent = sAfnd.status;
+                    document.getElementById('sim-afnd-rule-text').textContent = sAfnd.rule;
+
+                    const epsList = (sAfnd.epsilon_transitions_used || []).map(e => `${e.from}→${e.to}`);
+                    document.getElementById('sim-afnd-eps-edges').textContent = epsList.length ? epsList.join(', ') : 'Ninguna en este paso';
+
+                    (sAfnd.transitions_used || []).forEach(tr => {
+                        highlightEdge(dstAfnd, tr.from, tr.to, tr.label, '#2563eb', false);
+                    });
+                    (sAfnd.epsilon_transitions_used || []).forEach(etr => {
+                        highlightEdge(dstAfnd, etr.from, etr.to, 'ε', '#9333ea', true);
+                    });
+                    (sAfnd.active_states || []).forEach(stId => {
+                        const fillCol = (sAfnd.has_final && currentStepIndex === maxIdx) ? '#6ee7b7' : '#38bdf8';
+                        highlightStateNode(dstAfnd, stId, fillCol, '#0369a1');
+                    });
+                }
+            }
+
+            function selectTokenByUid(uid) {
+                if (!tokenMap[uid]) return;
+                currentToken = tokenMap[uid];
+                currentStepIndex = 0;
+                document.querySelectorAll('.sim-token-btn').forEach(btn => {
+                    if (btn.getAttribute('data-token-uid') === uid) {
+                        btn.classList.add('ring-2', 'ring-emerald-400', 'bg-emerald-950/60', 'border-emerald-500');
+                    } else {
+                        btn.classList.remove('ring-2', 'ring-emerald-400', 'bg-emerald-950/60', 'border-emerald-500');
+                    }
+                });
+                loadDiagramTemplatesForCategory(currentToken.automaton_category);
+                renderCurrentStep();
+            }
+
+            return {
+                selectTokenByUid: selectTokenByUid,
+                resetStep: function() { currentStepIndex = 0; renderCurrentStep(); },
+                startSimulation: function() {
+                    if (!currentToken) return;
+                    const maxIdx = (currentToken.afd.steps || []).length - 1;
+                    currentStepIndex = maxIdx >= 1 ? 1 : 0;
+                    renderCurrentStep();
+                },
+                prevStep: function() {
+                    if (currentStepIndex > 0) {
+                        currentStepIndex -= 1;
+                        renderCurrentStep();
+                    }
+                },
+                nextStep: function() {
+                    if (!currentToken) return;
+                    const maxIdx = (currentToken.afd.steps || []).length - 1;
+                    if (currentStepIndex < maxIdx) {
+                        currentStepIndex += 1;
+                        renderCurrentStep();
+                    }
+                },
+                endStep: function() {
+                    if (!currentToken) return;
+                    currentStepIndex = Math.max(0, (currentToken.afd.steps || []).length - 1);
+                    renderCurrentStep();
+                },
+                toggleSimplifiedView: function() {
+                    simplifiedView = !simplifiedView;
+                    renderCurrentStep();
+                },
+                adjustZoom: function(delta) {
+                    currentZoom = Math.min(2.0, Math.max(0.6, +(currentZoom + delta).toFixed(2)));
+                    applySimplifiedViewAndZoom();
+                },
+                resetZoom: function() {
+                    currentZoom = 1.0;
+                    applySimplifiedViewAndZoom();
+                },
+                getState: function() {
+                    return {
+                        token: currentToken,
+                        stepIndex: currentStepIndex,
+                        simplifiedView: simplifiedView,
+                        zoom: currentZoom
+                    };
+                }
+            };
+        })();
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const firstBtn = document.querySelector('.sim-token-btn');
+            if (firstBtn) {
+                window.SOCSimulator.selectTokenByUid(firstBtn.getAttribute('data-token-uid'));
+            }
+        });
+    </script>
 </body>
 </html>

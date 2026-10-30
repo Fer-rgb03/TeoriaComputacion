@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- AFD Ligero para JFLAP 7.1 (Representación Parcial de Diagnóstico sin qT) para LBRACE - Compatible con JFLAP 7.1 -->
+<structure>
+  <type>fa</type>
+  <automaton>
+    <state id="0" name="q0">
+      <x>60.0</x>
+      <y>82.0</y>
+      <initial/>
+    </state>
+    <state id="1" name="q1">
+      <x>215.0</x>
+      <y>82.0</y>
+      <final/>
+    </state>
+    <transition>
+      <from>0</from>
+      <to>1</to>
+      <read>{</read>
+    </transition>
+  </automaton>
+</structure>

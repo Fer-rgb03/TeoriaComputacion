@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- AFND de Thompson para COLON - Compatible con JFLAP 7.1 -->
+<structure>
+  <type>fa</type>
+  <automaton>
+    <state id="0" name="q0">
+      <x>60.0</x>
+      <y>110.0</y>
+      <initial/>
+    </state>
+    <state id="1" name="q1">
+      <x>215.0</x>
+      <y>110.0</y>
+      <final/>
+    </state>
+    <transition>
+      <from>0</from>
+      <to>1</to>
+      <read>:</read>
+    </transition>
+  </automaton>
+</structure>
