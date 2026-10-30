@@ -1,8 +1,17 @@
+# Entorno virtual
+.venv/
+venv/
+
+# Variables privadas
+.env
+
+# Archivos temporales de Python
 __pycache__/
 *.pyc
-venv/
-.env
+
+# Registros y sesiones
 logs/*.log
-.env
 app/storage/sesiones/
-__pycache__/
+
+# Archivos ZIP temporales
+app/storage/*.zip

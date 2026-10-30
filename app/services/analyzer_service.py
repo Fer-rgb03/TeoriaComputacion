@@ -1,19 +1,26 @@
 import os
 import re
 import csv
-import time
 import json
 import hmac
+import time
 import hashlib
 import calendar
 from datetime import datetime
 from app.config import Config
 from app.models.token_model import TokenModel
 from app.patterns.singleton.grammar_singleton import GrammarSingleton
-from app.services.jflap_service import build_master_automata_catalog, simulate_token_both_traces, SIGMA_ASCII
+from app.services.jflap_service import (
+    build_master_automata_catalog,
+    simulate_token_both_traces,
+    build_dynamic_lexeme_simulation_payload,
+    SIGMA_ASCII
+)
 from app.services.tree_service import build_token_real_trees, render_real_tree_svg, tree_to_parentheses
 
 grammar = GrammarSingleton()
+
+# Catálogo maestro precalculado con la fuente única formal (FormalAutomatonModel)
 MASTER_AUTOMATA_CATALOG = build_master_automata_catalog()
 
 MAX_LINE_LENGTH = 2048
@@ -35,98 +42,104 @@ VALID_JSON_ESCAPE_REGEX = re.compile(r'\\["\\/bfnrt]', re.ASCII)
 
 
 def _is_ascii_digits(s):
-    """F-04: Comprueba que todos los caracteres sean dígitos ASCII '0'..'9' (rechaza dígitos Unicode)."""
+    """Verifica que todos los caracteres sean dígitos ASCII '0'..'9'."""
     return bool(s) and all('0' <= ch <= '9' for ch in s)
 
 
 def validate_timestamp_strict(ts_str):
-    """F-05 y F-06: Comprueba calendario gregoriano sobre un TIMESTAMP que ya pasó el formato léxico."""
-    if len(ts_str) != 19 or ts_str[4] != '-' or ts_str[7] != '-' or ts_str[10] != 'T' or ts_str[13] != ':' or ts_str[16] != ':':
-        return False, "Formato TIMESTAMP fuera de la especificación AAAA-MM-DDTHH:MM:SS."
+    """Verifica formato ISO-8601 y validez real en calendario gregoriano."""
+    if len(ts_str) != 19:
+        extra = ts_str[19:]
+        return False, f"Formato TIMESTAMP fuera del alcance UTC local: sufijo no admitido ({extra!r})."
+    if ts_str[4] != '-' or ts_str[7] != '-' or ts_str[10] != 'T' or ts_str[13] != ':' or ts_str[16] != ':':
+        return False, "Formato TIMESTAMP inválido (se requiere AAAA-MM-DDTHH:MM:SS)."
     parts_digits = ts_str[0:4] + ts_str[5:7] + ts_str[8:10] + ts_str[11:13] + ts_str[14:16] + ts_str[17:19]
     if not _is_ascii_digits(parts_digits):
         return False, "TIMESTAMP contiene caracteres no pertenecientes a dígitos ASCII [0-9]."
 
-    year = int(ts_str[0:4])
-    month = int(ts_str[5:7])
-    day = int(ts_str[8:10])
-    hour = int(ts_str[11:13])
-    minute = int(ts_str[14:16])
-    second = int(ts_str[17:19])
+    try:
+        year = int(ts_str[0:4])
+        month = int(ts_str[5:7])
+        day = int(ts_str[8:10])
+        hour = int(ts_str[11:13])
+        minute = int(ts_str[14:16])
+        second = int(ts_str[17:19])
 
-    if not (1970 <= year <= 2100):
-        return False, f"Año fuera de rango operativo ({year})."
-    if not (1 <= month <= 12):
-        return False, f"Mes inválido ({month:02d}); rango permitido 01..12."
-    max_day = calendar.monthrange(year, month)[1]
-    if not (1 <= day <= max_day):
-        leap_note = "año bisiesto" if calendar.isleap(year) else "año no bisiesto"
-        return False, f"Día inexistente en calendario ({day:02d}) para el mes {month:02d}/{year} ({leap_note}, máx {max_day} días)."
-    if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
-        return False, f"Hora fuera de rango ({hour:02d}:{minute:02d}:{second:02d})."
-    return True, f"Fecha/hora calendario válida ({ts_str})"
+        if not (1970 <= year <= 2100):
+            return False, f"Año fuera de rango operativo ({year})."
+        if not (1 <= month <= 12):
+            return False, f"Mes inválido ({month:02d}); rango permitido 01..12."
+        max_day = calendar.monthrange(year, month)[1]
+        if not (1 <= day <= max_day):
+            leap_note = "año bisiesto" if calendar.isleap(year) else "año no bisiesto"
+            return False, f"Día inexistente ({day:02d}) para el mes {month:02d}/{year} ({leap_note}, máx {max_day} días)."
+        if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
+            return False, f"Hora inválida ({hour:02d}:{minute:02d}:{second:02d}); rango permitido 00:00:00 a 23:59:59."
+        return True, f"Fecha/hora calendario válida ({ts_str})"
+    except ValueError:
+        return False, "Componentes numéricos corruptos en TIMESTAMP."
 
 
 def validate_ipv4_strict(ip_str):
-    """F-04: Verifica octetos IPv4 usando exclusivamente dígitos ASCII [0-9] y rango 0..255."""
+    """Verifica que cada octeto IPv4 esté en el intervalo 0..255 sin ceros iniciales."""
     parts = ip_str.split('.')
     if len(parts) != 4:
         return False, "La dirección IPv4 debe tener exactamente 4 octetos."
     for idx, part in enumerate(parts, start=1):
         if not _is_ascii_digits(part):
-            return False, f"Octeto #{idx} ({part!r}) contiene caracteres fuera de los dígitos ASCII [0-9]."
+            return False, f"Octeto #{idx} ({part!r}) no es numérico ASCII."
         if len(part) > 1 and part.startswith('0'):
             return False, f"Octeto #{idx} ({part!r}) contiene ceros iniciales no permitidos."
         val = int(part)
         if not (0 <= val <= 255):
-            return False, f"Octeto #{idx} ({val}) fuera del intervalo válido [0..255]."
-    return True, "IPv4 válida (octetos ASCII en 0..255)"
+            return False, f"Octeto #{idx} ({val}) fuera del intervalo IPv4 permitido [0..255]."
+    return True, "IPv4 válida (octetos en 0..255)"
+
+
+# Alfabeto ASCII imprimible completo (códigos 32..126, incluyendo el espacio ' ')
+# permitido en el interior de literales JSON STRING.
+SIGMA_ASCII_PRINTABLE = frozenset(SIGMA_ASCII) | {' '}
 
 
 def validate_string_security_and_type(str_lexeme, is_key=False):
-    """F-04, F-10, F-12 y F-13: Verifica que la cadena pertenezca a SIGMA_ASCII y evalúa patrones heurísticos."""
+    """Valida cadenas JSON simplificadas y detecta patrones heurísticos sospechosos."""
     if len(str_lexeme) < 2 or not (str_lexeme.startswith('"') and str_lexeme.endswith('"')):
         return False, "Cadena mal delimitada por comillas."
     inner = str_lexeme[1:-1]
     for ch in inner:
-        if ch not in SIGMA_ASCII:
-            return False, f"Carácter {ch!r} (U+{ord(ch):04X}) fuera del alfabeto Σ_ASCII (códigos 32..126)."
+        if ch not in SIGMA_ASCII_PRINTABLE:
+            return False, f"Carácter {ch!r} fuera del alfabeto Σ_ASCII (32..126)."
     if len(inner) > 256:
-        return False, "Longitud de cadena excede el límite de 256 caracteres."
+        return False, "Longitud de cadena excede el límite de seguridad (256 caracteres)."
 
     cleaned_escapes = VALID_JSON_ESCAPE_REGEX.sub('', inner)
     if '\\' in cleaned_escapes or '"' in cleaned_escapes:
-        return False, "Secuencia de escape no soportada en JSON simplificado (solo \\\", \\\\, \\/, \\b, \\f, \\n, \\r, \\t)."
+        return False, "Secuencia de escape JSON no soportada."
 
     if is_key and not SAFE_KEY_IDENTIFIER.match(str_lexeme):
-        return False, f"La clave JSON {str_lexeme} incumple el contrato de identificador ASCII ([a-zA-Z0-9_.-]+)."
+        return False, f"La clave JSON {str_lexeme} contiene caracteres no permitidos."
     match = SUSPICIOUS_INPUT_PATTERNS.search(inner)
     if match:
-        return False, f"Entrada sospechosa detectada por patrón heurístico ({match.group(0)!r})."
+        return False, f"Entrada sospechosa detectada por patrón ({match.group(0)!r})."
     return True, "Literal ASCII verificado"
 
 
 def normalize_record_for_hmac(raw_log):
-    """F-02: Define la normalización canónica exacta (UTF-8 sin espacios extremos) para firmar y verificar."""
     return raw_log.strip().encode('utf-8')
 
 
 def compute_record_hmac(raw_log):
-    """F-02 y F-03: Calcula HMAC-SHA256 usando la clave configurada en Config."""
     key_bytes = Config.SOC_HMAC_SECRET_KEY.encode('utf-8')
     return hmac.new(key_bytes, normalize_record_for_hmac(raw_log), hashlib.sha256).hexdigest()
 
 
 def verify_record_hmac(raw_log, stored_hmac):
-    """F-02: Recalcula el HMAC a partir de un registro y lo compara en tiempo constante contra una huella almacenada."""
     if not stored_hmac or not isinstance(stored_hmac, str):
         return False
-    recalculated = compute_record_hmac(raw_log)
-    return hmac.compare_digest(recalculated, stored_hmac)
+    return hmac.compare_digest(compute_record_hmac(raw_log), stored_hmac)
 
 
 def cleanup_expired_reports():
-    """F-15: Política automática de retención y limpieza de reportes antiguos en Config.SESSIONS_DIR."""
     os.makedirs(Config.SESSIONS_DIR, exist_ok=True)
     now_ts = time.time()
     retention = Config.REPORT_RETENTION_SECONDS
@@ -144,7 +157,6 @@ def cleanup_expired_reports():
             except OSError:
                 pass
 
-    # Limitar cantidad máxima de archivos de sesión almacenados
     max_files = Config.MAX_STORED_SESSIONS * 3
     if len(files_info) > max_files:
         files_info.sort(key=lambda x: x[0])
@@ -155,13 +167,74 @@ def cleanup_expired_reports():
                 pass
 
 
+def _infer_expected_category_by_position(token_position_1based):
+    """
+    Para un símbolo ilegal (MISMATCH) en la posición k de la gramática
+    LOG -> TIMESTAMP IP SEVERITY EVENT_TYPE PAYLOAD, determina el autómata
+    de la categoría esperada donde ocurre el rechazo hacia qT / ∅.
+    """
+    pos_map = {
+        1: 'TIMESTAMP',
+        2: 'IP',
+        3: 'SEVERITY',
+        4: 'EVENT_TYPE',
+        5: 'LBRACE'
+    }
+    return pos_map.get(token_position_1based, 'STRING')
+
+
+def _attach_global_log_verdict(res_dict):
+    """
+    Garantiza que TODOS los tokens de un registro (sea válido o rechazado por
+    error léxico, sintáctico, semántico o de seguridad) posean 'dynamic_simulation'
+    con los 6 campos del veredicto global sincronizados con el resultado del log.
+    """
+    line_num = res_dict.get('line_number', 1)
+    valid_lex = bool(res_dict.get('valid_lexical', False))
+    valid_syn = bool(res_dict.get('valid_syntactic', False))
+    valid_sem = bool(res_dict.get('valid_semantic', False))
+    valid_sec = bool(res_dict.get('valid_security', False))
+    is_val = bool(res_dict.get('is_valid', False))
+    status_str = res_dict.get('status', '')
+    errs = list(res_dict.get('errors', []))
+
+    for t in res_dict.get('tokens', []):
+        if 'dynamic_simulation' not in t or not t['dynamic_simulation']:
+            cat_override = (
+                _infer_expected_category_by_position(t.get('index', 1))
+                if t.get('type') == 'ERROR_LEXICO' else None
+            )
+            t['dynamic_simulation'] = build_dynamic_lexeme_simulation_payload(
+                tok_type=t.get('type', 'ERROR_LEXICO'),
+                lexeme=t.get('value', ''),
+                line_number=t.get('line', line_num),
+                column=t.get('column', 1),
+                token_index=t.get('index', 1),
+                sem_ok=bool(t.get('sem_ok', False)),
+                sem_msg=t.get('sem_msg', ''),
+                valid_lexical_line=valid_lex,
+                target_category_override=cat_override
+            )
+
+        dyn = t['dynamic_simulation']
+        dyn['valid_lexical_line'] = valid_lex
+        dyn['log_status'] = status_str
+        dyn['log_is_valid'] = is_val
+        dyn['log_valid_lexical'] = valid_lex
+        dyn['log_valid_syntactic'] = valid_syn
+        dyn['log_valid_semantic'] = valid_sem
+        dyn['log_valid_security'] = valid_sec
+        dyn['log_errors'] = errs
+
+    return res_dict
+
+
 def analyze_single_log(log_line, line_number=1):
     tokens = []
     lexical_errors = []
 
-    # F-17: Informar longitud recibida y límite máximo permitido (2048 caracteres)
     if len(log_line) > MAX_LINE_LENGTH:
-        return {
+        return _attach_global_log_verdict({
             'line_number': line_number,
             'raw': log_line[:160] + f'... [VISTA ACOTADA: longitud recibida={len(log_line)} chars]',
             'valid_lexical': False,
@@ -182,7 +255,7 @@ def analyze_single_log(log_line, line_number=1):
             'general_paren': '',
             'integrity_hmac': None,
             'hmac_verified': False
-        }
+        })
 
     for mo in grammar.TOK_REGEX.finditer(log_line):
         kind = mo.lastgroup
@@ -193,6 +266,9 @@ def analyze_single_log(log_line, line_number=1):
             continue
 
         if kind == 'MISMATCH':
+            next_idx = len(tokens) + 1
+            expected_cat = _infer_expected_category_by_position(next_idx)
+            sim_mismatch = simulate_token_both_traces(expected_cat, value)
             err_detail = (
                 f"Línea {line_number}, Col {col}: Símbolo ilegal {value!r} ∉ Σ_token (ASCII imprimible). "
                 f"El AFD transita al Estado Trampa (qT)."
@@ -200,7 +276,7 @@ def analyze_single_log(log_line, line_number=1):
             lexical_errors.append(err_detail)
             meta = grammar.TOKEN_METADATA['ERROR_LEXICO']
             bad_tok = TokenModel(
-                index=len(tokens) + 1,
+                index=next_idx,
                 type='ERROR_LEXICO',
                 value=value,
                 line=line_number,
@@ -218,11 +294,23 @@ def analyze_single_log(log_line, line_number=1):
                 sem_ok=False,
                 sem_msg=f"Símbolo ilegal {value!r} en Col {col} (Rechazado en qT)"
             ).to_dict()
-            bad_tok['live_trace'] = f"Traza AFD (Reject): Posición Col {col}: {value!r} → qT"
+            bad_tok['live_trace'] = sim_mismatch['combined_trace']
+            bad_tok['dynamic_simulation'] = build_dynamic_lexeme_simulation_payload(
+                tok_type='ERROR_LEXICO',
+                lexeme=value,
+                line_number=line_number,
+                column=col,
+                token_index=next_idx,
+                sem_ok=False,
+                sem_msg=bad_tok['sem_msg'],
+                valid_lexical_line=False,
+                target_category_override=expected_cat
+            )
             tokens.append(bad_tok)
             continue
 
         if kind == 'MALFORMED_TIMESTAMP':
+            next_idx = len(tokens) + 1
             sim_ts = simulate_token_both_traces('TIMESTAMP', value)
             err_detail = (
                 f"Línea {line_number}, Col {col}: Marca temporal {value!r} rechazada en Fase Léxica por el AFD de TIMESTAMP "
@@ -231,7 +319,7 @@ def analyze_single_log(log_line, line_number=1):
             )
             lexical_errors.append(err_detail)
             bad_tok = TokenModel(
-                index=len(tokens) + 1,
+                index=next_idx,
                 type='ERROR_LEXICO',
                 value=value,
                 line=line_number,
@@ -250,10 +338,22 @@ def analyze_single_log(log_line, line_number=1):
                 sem_msg="Rechazado en el AFD de TIMESTAMP (transita a qT)"
             ).to_dict()
             bad_tok['live_trace'] = sim_ts['combined_trace']
+            bad_tok['dynamic_simulation'] = build_dynamic_lexeme_simulation_payload(
+                tok_type='ERROR_LEXICO',
+                lexeme=value,
+                line_number=line_number,
+                column=col,
+                token_index=next_idx,
+                sem_ok=False,
+                sem_msg=bad_tok['sem_msg'],
+                valid_lexical_line=False,
+                target_category_override='TIMESTAMP'
+            )
             tokens.append(bad_tok)
             continue
 
         if kind == 'LEADING_ZERO':
+            next_idx = len(tokens) + 1
             sim_num = simulate_token_both_traces('NUMBER', value)
             err_detail = (
                 f"Línea {line_number}, Col {col}: Entero con cero inicial prohibido {value!r} "
@@ -261,7 +361,7 @@ def analyze_single_log(log_line, line_number=1):
             )
             lexical_errors.append(err_detail)
             bad_tok = TokenModel(
-                index=len(tokens) + 1,
+                index=next_idx,
                 type='ERROR_LEXICO',
                 value=value,
                 line=line_number,
@@ -280,10 +380,20 @@ def analyze_single_log(log_line, line_number=1):
                 sem_msg="Rechazado por AFD de NUMBER (q1 -> qT)"
             ).to_dict()
             bad_tok['live_trace'] = sim_num['combined_trace']
+            bad_tok['dynamic_simulation'] = build_dynamic_lexeme_simulation_payload(
+                tok_type='ERROR_LEXICO',
+                lexeme=value,
+                line_number=line_number,
+                column=col,
+                token_index=next_idx,
+                sem_ok=False,
+                sem_msg=bad_tok['sem_msg'],
+                valid_lexical_line=False,
+                target_category_override='NUMBER'
+            )
             tokens.append(bad_tok)
             continue
 
-        # F-05: Uso del retorno booleano estructurado de simulate_token_both_traces
         sim_info = simulate_token_both_traces(kind, value)
         live_trace = sim_info['combined_trace']
 
@@ -331,13 +441,23 @@ def analyze_single_log(log_line, line_number=1):
             sem_msg=sem_msg
         ).to_dict()
         tok_obj['live_trace'] = live_trace
+        tok_obj['dynamic_simulation'] = build_dynamic_lexeme_simulation_payload(
+            tok_type=kind,
+            lexeme=value,
+            line_number=line_number,
+            column=col,
+            token_index=tok_obj['index'],
+            sem_ok=sem_ok,
+            sem_msg=sem_msg,
+            valid_lexical_line=True
+        )
         tokens.append(tok_obj)
 
     if lexical_errors:
         for t in tokens:
             if t['type'] != 'ERROR_LEXICO' and t['sem_ok']:
                 t['sem_msg'] = f"{t['sem_msg']} (Registro anulado por Error Léxico)"
-        return {
+        return _attach_global_log_verdict({
             'line_number': line_number,
             'raw': log_line,
             'valid_lexical': False,
@@ -355,7 +475,7 @@ def analyze_single_log(log_line, line_number=1):
             'general_paren': '',
             'integrity_hmac': None,
             'hmac_verified': False
-        }
+        })
 
     pos = 0
     pda_stack = ['Z0']
@@ -389,7 +509,6 @@ def analyze_single_log(log_line, line_number=1):
             f"Se esperaba {exp_str}, pero se encontró {found_str}."
         )
 
-    # F-20: Construcción recursiva tanto del árbol sintáctico como del árbol semántico de PAYLOAD
     def parse_payload():
         nonlocal pos
         _, n_lb = match('LBRACE', "delimitador de apertura '{' (LBRACE)")
@@ -446,7 +565,6 @@ def analyze_single_log(log_line, line_number=1):
         _, n_col = match('COLON', "separador ':' (COLON)")
         v_sem_desc, n_val_syn, nested_sem_children = parse_value()
 
-        # F-20: Si el valor es un objeto JSON anidado, preserva sus hijos jerárquicamente bajo la clave padre
         if nested_sem_children is not None:
             sem_node = {'label': key_val, 'sub': 'ObjetoJSON', 'children': nested_sem_children}
         else:
@@ -529,7 +647,7 @@ def analyze_single_log(log_line, line_number=1):
             ]
         }
 
-        return {
+        return _attach_global_log_verdict({
             'line_number': line_number,
             'raw': log_line,
             'valid_lexical': True,
@@ -547,11 +665,11 @@ def analyze_single_log(log_line, line_number=1):
             'general_paren': tree_to_parentheses(general_syn_dict),
             'integrity_hmac': record_hmac,
             'hmac_verified': False
-        }
+        })
 
     except SyntaxError as e:
         pda_trace.append(f"❌ Rechazo en Autómata de Pila / Parser: {e}")
-        return {
+        return _attach_global_log_verdict({
             'line_number': line_number,
             'raw': log_line,
             'valid_lexical': True,
@@ -569,15 +687,10 @@ def analyze_single_log(log_line, line_number=1):
             'general_paren': '',
             'integrity_hmac': None,
             'hmac_verified': False
-        }
+        })
 
 
 def save_session_reports(results, run_id, truncation_info=None):
-    """
-    F-02, F-08, F-15 y F-21:
-    Persiste los registros en Config.SESSIONS_DIR y luego ejecuta una operación independiente
-    de lectura desde disco (verify_persisted_session_records) para verificar la integridad post-almacenamiento.
-    """
     cleanup_expired_reports()
     os.makedirs(Config.SESSIONS_DIR, exist_ok=True)
 
@@ -614,7 +727,6 @@ def save_session_reports(results, run_id, truncation_info=None):
                 "hmac_sha256": r.get('integrity_hmac')
             })
 
-    # Guardar almacén de registros aceptados para verificación posterior independiente (F-02)
     ruta_store_session = os.path.join(Config.SESSIONS_DIR, f"registros_firmados_{run_id}.json")
     with open(ruta_store_session, "w", encoding="utf-8") as fs:
         json.dump({
@@ -623,9 +735,8 @@ def save_session_reports(results, run_id, truncation_info=None):
             "registros": logs_verificados
         }, fs, indent=4, ensure_ascii=False)
 
-    # F-02: Ejecutar verificación independiente leyendo desde el archivo ya persistido en disco
-    audit_Check = verify_persisted_session_records(run_id)
-    verified_map = {item['linea']: item['integro'] for item in audit_Check['detalles']}
+    audit_check = verify_persisted_session_records(run_id)
+    verified_map = {item['linea']: item['integro'] for item in audit_check['detalles']}
     for r in results:
         if r['is_valid']:
             r['hmac_verified'] = verified_map.get(r['line_number'], False)
@@ -709,12 +820,6 @@ def save_session_reports(results, run_id, truncation_info=None):
 
 
 def verify_persisted_session_records(run_id, storage_path=None):
-    """
-    F-02: Operación independiente de verificación de integridad post-almacenamiento.
-    Lee el archivo JSON persistido en disco, recalcula el HMAC-SHA256 de cada 'log_original'
-    recuperado y lo compara contra la huella 'hmac_sha256' almacenada. Si alguien modifica un
-    solo carácter del registro en el archivo JSON, esta verificación devuelve integro=False.
-    """
     ruta = storage_path or os.path.join(Config.SESSIONS_DIR, f"registros_firmados_{run_id}.json")
     if not os.path.exists(ruta):
         return {"verificado": False, "total": 0, "integros": 0, "alterados": 0, "detalles": []}
@@ -751,11 +856,6 @@ def verify_persisted_session_records(run_id, storage_path=None):
 
 
 def analyze_logs_input(raw_input, run_id=None, persist_reports=False, is_demo=False):
-    """
-    F-07, F-08 y F-16:
-    No sustituye entradas vacías por datos de muestra salvo que is_demo=True.
-    Informa explícitamente el total recibido, procesado y descartado cuando el lote supera 200 líneas.
-    """
     if is_demo and (not raw_input or not raw_input.strip()):
         raw_input = DEFAULT_SAMPLE_LOGS
 
@@ -776,7 +876,9 @@ def analyze_logs_input(raw_input, run_id=None, persist_reports=False, is_demo=Fa
             'master_catalog': MASTER_AUTOMATA_CATALOG,
             'run_id': None,
             'has_analyzed': False,
-            'is_demo': False
+            'is_demo': False,
+            'dynamic_lexemes_by_type': {tok_t: [] for tok_t in MASTER_AUTOMATA_CATALOG},
+            'all_dynamic_tokens': []
         }
 
     all_lines = [line.strip() for line in raw_input.splitlines() if line.strip()]
@@ -811,6 +913,17 @@ def analyze_logs_input(raw_input, run_id=None, persist_reports=False, is_demo=Fa
         save_session_reports(results, run_id=run_id, truncation_info=trunc_info)
         audit_summary = verify_persisted_session_records(run_id)
 
+    dynamic_lexemes_by_type = {tok_t: [] for tok_t in MASTER_AUTOMATA_CATALOG}
+    all_dynamic_tokens = []
+    for r in results:
+        for t in r['tokens']:
+            dyn = t.get('dynamic_simulation')
+            if dyn:
+                all_dynamic_tokens.append(dyn)
+                cat_key = dyn.get('automaton_category', t['type'])
+                if cat_key in dynamic_lexemes_by_type:
+                    dynamic_lexemes_by_type[cat_key].append(dyn)
+
     summary = {
         'total_received': total_received,
         'total_lines': len(results),
@@ -830,5 +943,7 @@ def analyze_logs_input(raw_input, run_id=None, persist_reports=False, is_demo=Fa
         'run_id': run_id if (persist_reports and not is_demo) else None,
         'has_analyzed': bool(persist_reports and not is_demo),
         'is_demo': is_demo,
-        'audit_summary': audit_summary
+        'audit_summary': audit_summary,
+        'dynamic_lexemes_by_type': dynamic_lexemes_by_type,
+        'all_dynamic_tokens': all_dynamic_tokens
     }
