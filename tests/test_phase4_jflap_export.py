@@ -302,6 +302,100 @@ class TestPhase4JFLAPExportAndConsistency(unittest.TestCase):
                 xml_disk = f.read()
             self.assertEqual(xml_fn, xml_disk)
 
+    def test_15_afd_string_jff_q1_transitions_and_complete_step_by_step_walk_for_admin(self):
+        """
+        Requisitos 1, 2, 3 y 7 (Corrección Urgente AFD_STRING.jff):
+        1) Inspecciona las transiciones que salen de q1 en AFD_STRING.jff y comprueba que
+           existen transiciones individuales <read>a</read>, <read>d</read>, <read>m</read>,
+           <read>i</read>, <read>n</read>, <read> </read>, <read>\\</read> y <read>"</read>.
+        2) Comprueba paso a paso que existe un recorrido completo y válido para '"admin"'
+           en AFD_STRING.jff desde q0 hasta el estado final q3 (q0 -> q1 -> q1 -> ... -> q3).
+        """
+        path_afd, path_afnd = self.generated_files['STRING']
+        with open(path_afd, "r", encoding="utf-8") as f:
+            xml_str = f.read()
+
+        states, transitions = parse_jff_xml_to_automaton(xml_str)
+        state_map = {s['id']: s for s in states}
+        self.assertIn('q0', state_map)
+        self.assertIn('q1', state_map)
+        self.assertTrue(state_map['q0']['initial'])
+
+        # 1. Inspeccionar transiciones salientes de q1
+        q1_out = {(t['label'], t['to']) for t in transitions if t['from'] == 'q1'}
+        q1_labels = {t['label'] for t in transitions if t['from'] == 'q1'}
+        for required_char in ('a', 'd', 'm', 'i', 'n', 'u', '1', '2', '3', ' ', '\\', '"'):
+            self.assertIn(
+                required_char, q1_labels,
+                f"Falta la transición con el símbolo {required_char!r} saliendo de q1 en AFD_STRING.jff"
+            )
+
+        # Verificar que desde q1 con 'a' avanza determinísticamente a q1
+        a_targets = [t['to'] for t in transitions if t['from'] == 'q1' and t['label'] == 'a']
+        self.assertEqual(a_targets, ['q1'])
+
+        # 2. Recorrido paso a paso completo de '"admin"' sobre las transiciones del XML de AFD_STRING.jff
+        delta_jff = {(t['from'], t['label']): t['to'] for t in transitions}
+        curr = 'q0'
+        walk_states = [curr]
+        for ch in '"admin"':
+            self.assertIn((curr, ch), delta_jff, f"AFD_STRING.jff se detuvo en {curr} al leer {ch!r}")
+            curr = delta_jff[(curr, ch)]
+            walk_states.append(curr)
+
+        self.assertEqual(walk_states, ['q0', 'q1', 'q1', 'q1', 'q1', 'q1', 'q1', 'q3'])
+        self.assertTrue(state_map[curr]['final'], f"El estado final alcanzado ({curr}) no está marcado como <final/>")
+
+    def test_16_string_jff_mandatory_cases_and_admin_path(self):
+        """
+        Objetivo principal (Fase 4 - Corrección urgente AFD_STRING.jff):
+        Comprueba que JFLAP pueda ejecutar 'admin' desde q0 hasta un estado final,
+        mostrando Accept en Multiple Run para los 5 casos obligatorios:
+          - "admin" -> Accept
+          - "usuario123" -> Accept
+          - "hola mundo" -> Accept
+          - "" -> Accept
+          - "texto con espacios" -> Accept
+        y validando su equivalencia formal con AFND_STRING.jff.
+        """
+        perm_dir = "app/storage/jff"
+        p_afd_str = os.path.join(perm_dir, "AFD_STRING.jff")
+        p_afnd_str = os.path.join(perm_dir, "AFND_STRING.jff")
+        afd_model, afnd_model, _ = get_formal_automaton_pair('STRING')
+
+        mandatory_strings = [
+            '"admin"',
+            '"usuario123"',
+            '"hola mundo"',
+            '""',
+            '"texto con espacios"'
+        ]
+
+        for s_word in mandatory_strings:
+            # 1. Simulador interno AFD
+            self.assertTrue(
+                afd_model.simulate(s_word)['accepted'],
+                f"El simulador AFD interno rechazó la cadena válida {s_word!r}"
+            )
+            # 2. Simulador interno AFND
+            self.assertTrue(
+                afnd_model.simulate(s_word)['accepted'],
+                f"El simulador AFND interno rechazó la cadena válida {s_word!r}"
+            )
+            # 3. Archivo AFD_STRING.jff cargado desde disco
+            self.assertTrue(
+                simulate_loaded_jff_directly(p_afd_str, s_word),
+                f"AFD_STRING.jff falló en JFLAP Multiple Run para {s_word!r}"
+            )
+            # 4. Archivo AFND_STRING.jff cargado desde disco
+            self.assertTrue(
+                simulate_loaded_jff_directly(p_afnd_str, s_word),
+                f"AFND_STRING.jff falló en JFLAP Multiple Run para {s_word!r}"
+            )
+
+        # Verificación formal de equivalencia por producto para STRING
+        proof_str = prove_three_way_equivalence(afd_model, p_afd_str, p_afnd_str)
+        self.assertTrue(proof_str['equivalent'], f"Discrepancia formal en STRING: {proof_str}")
 
 if __name__ == '__main__':
     unittest.main()

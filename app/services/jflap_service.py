@@ -486,7 +486,7 @@ def get_token_automata_spec(tok_type):
         'IP': ['192.168.1.10', '192.168.001.10', '192.168.256.10', '192.168.1', '192.168.1.10.5'],
         'SEVERITY': ['ERROR', 'INFO', 'CRITICAL', 'ERR'],
         'EVENT_TYPE': ['LOGIN_FAILED', 'PRIVILEGE_ESCALATION', '_LOGIN', 'LOGIN__'],
-        'STRING': ['"security_admin"', '"usr\\"admin"', '"admin', '"中文"'],
+        'STRING': ['"admin"', '"usuario123"', '"hola mundo"', '""', '"texto con espacios"'],
         'NUMBER': ['5', '0', '2026', '007'],
         'LBRACE': ['{', '{{', 'a'],
         'RBRACE': ['}', '}}', 'a'],

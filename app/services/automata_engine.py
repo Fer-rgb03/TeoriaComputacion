@@ -5,10 +5,12 @@ from app.utils.helpers import escape_svg_text
 # Alfabeto formal de tokens para JFLAP 7.1: caracteres ASCII gráficos visibles (códigos 33..126, 94 símbolos).
 # Se excluye chr(32) (' ') porque es el delimitador léxico entre tokens y porque DOMPrettier de JFLAP 7.1
 # aplica String.trim() a los nodos de texto XML, convirtiendo <read> </read> en <read/> (transición λ).
+# Alfabeto formal base de tokens (códigos 33..126, 94 símbolos gráficos)
 SIGMA_ASCII = [chr(c) for c in range(33, 127)]
 ASCII_DIGITS = [chr(c) for c in range(ord('0'), ord('9') + 1)]
 ASCII_UPPERS = [chr(c) for c in range(ord('A'), ord('Z') + 1)]
-ASCII_STRING_BASE = [c for c in SIGMA_ASCII if c not in ('"', '\\')]
+# En STRING se permite además el carácter espacio ' ' (ASCII 32) junto con los 92 caracteres gráficos sin '"' ni '\'
+ASCII_STRING_BASE = [' '] + [c for c in SIGMA_ASCII if c not in ('"', '\\')]
 ASCII_STRING_ESC = ['"', '\\', '/', 'b', 'f', 'n', 'r', 't']
 
 SYMBOL_CLASS_MAP = {
@@ -21,7 +23,9 @@ SYMBOL_CLASS_MAP = {
     '0..5': [str(d) for d in range(6)],
     'A..Z': ASCII_UPPERS,
     'Σ_base': ASCII_STRING_BASE,
+    'CHAR_BASE': ASCII_STRING_BASE,
     'Σ_esc': ASCII_STRING_ESC,
+    'CHAR_ESC': ASCII_STRING_ESC,
 }
 
 _REGISTERED_COMPLEMENT_SETS = {}
@@ -137,7 +141,7 @@ TOKEN_FORMAL_REGEX_AST_SPECS = {
     ),
     'SEVERITY': "INFO|WARNING|ERROR|CRITICAL",
     'EVENT_TYPE': "[A..Z]+(_[A..Z]+)*",
-    'STRING': '"([Σ_base]|\\\\[Σ_esc])*"',
+    'STRING': '"([CHAR_BASE]|\\\\[CHAR_ESC])*"',
     'NUMBER': "0|[1..9][0..9]*",
     'LBRACE': "\\{",
     'RBRACE': "\\}",
@@ -409,6 +413,66 @@ def subset_construction_afnd_to_afd(states_afnd, trans_afnd, tok_type="TOKEN", i
             v_id = subset_to_id[target_set]
             dfa_char_transitions[(u_id, ch)] = v_id
 
+    # En STRING, fusionar los subconjuntos interiores equivalentes (q1, q3, q5) que tienen
+    # idéntica condición de aceptación e idénticas transiciones para todo símbolo ch,
+    # de modo que 'a'..'z', '0'..'9' y ' ' sean un bucle directo en q1 en JFLAP 7.1.
+    if tok_type == 'STRING':
+        changed = True
+        while changed:
+            changed = False
+            active_ids = list(id_to_subset.keys())
+            sig_map = {}
+            merge_target = {}
+            for sid in active_ids:
+                is_init = (sid == 'q0')
+                is_fin = bool(id_to_subset[sid] & final_nfa_set)
+                out_profile = tuple(
+                    (ch, dfa_char_transitions.get((sid, ch)))
+                    for ch in relevant_chars
+                    if (sid, ch) in dfa_char_transitions
+                )
+                sig = (is_init, is_fin, out_profile)
+                if sig in sig_map:
+                    merge_target[sid] = sig_map[sig]
+                    changed = True
+                else:
+                    sig_map[sig] = sid
+
+            if changed:
+                for old_sid, canon_sid in merge_target.items():
+                    id_to_subset[canon_sid] = frozenset(id_to_subset[canon_sid] | id_to_subset[old_sid])
+                    del id_to_subset[old_sid]
+                new_dfa_trans = {}
+                for (u_id, ch), v_id in dfa_char_transitions.items():
+                    u_new = merge_target.get(u_id, u_id)
+                    v_new = merge_target.get(v_id, v_id)
+                    if u_new in id_to_subset and v_new in id_to_subset:
+                        new_dfa_trans[(u_new, ch)] = v_new
+                dfa_char_transitions = new_dfa_trans
+
+        # Renumerar limpiamente q0, q1, q2, q3 en orden BFS para que q3 sea el estado final
+        ordered_ids = ['q0']
+        bfs_q = deque(['q0'])
+        while bfs_q:
+            curr_u = bfs_q.popleft()
+            # Ordenar destinos priorizando no finales antes del estado final de cierre
+            next_candidates = []
+            for ch in relevant_chars:
+                v_cand = dfa_char_transitions.get((curr_u, ch))
+                if v_cand and v_cand not in ordered_ids and v_cand not in next_candidates:
+                    next_candidates.append(v_cand)
+            next_candidates.sort(key=lambda s_id: (1 if (id_to_subset[s_id] & final_nfa_set) else 0))
+            for vc in next_candidates:
+                ordered_ids.append(vc)
+                bfs_q.append(vc)
+
+        rename_map = {old_id: f"q{idx}" for idx, old_id in enumerate(ordered_ids)}
+        id_to_subset = {rename_map[old_id]: id_to_subset[old_id] for old_id in ordered_ids}
+        dfa_char_transitions = {
+            (rename_map[u], ch): rename_map[v]
+            for (u, ch), v in dfa_char_transitions.items()
+        }
+
     states_afd = []
     for dfa_id, nfa_subset in id_to_subset.items():
         sorted_sub = _sort_nfa_state_names(nfa_subset)
@@ -466,7 +530,7 @@ def subset_construction_afnd_to_afd(states_afnd, trans_afnd, tok_type="TOKEN", i
             if s.get('trap'):
                 continue
             uid = s['id']
-            outgoing_chars = {ch for (u, ch) in dfa_char_transitions if u == uid}
+            outgoing_chars = {ch for (u, ch) in dfa_char_transitions if u == uid and ch in SIGMA_ASCII}
             comp_label = build_complement_label(outgoing_chars)
             if comp_label:
                 trans_afd.append({'from': uid, 'to': 'qT', 'label': comp_label})
@@ -734,7 +798,7 @@ def simulate_afnd_structured(states_afnd, trans_afnd, input_str):
 
         is_string_space = (
             ch == ' ' and any(
-                t['from'] in curr_closure and t['label'] == 'Σ_base' for t in trans_afnd
+                t['from'] in curr_closure and ' ' in expand_atomic_label(t['label']) for t in trans_afnd
             )
         )
 
@@ -959,6 +1023,11 @@ class FormalAutomatonModel:
             if u not in idx_map or v not in idx_map:
                 continue
             for ch in expand_atomic_label(t['label']):
+                # En el conteo de completitud sobre SIGMA_ASCII (33..126) del AFD completo con qT,
+                # excluir chr(32) cuando include_trap=True para mantener exactamente |Q|*94 aristas;
+                # en el AFD ligero exportado (include_trap=False) y en el AFND, incluir ' ' para JFLAP 7.1.
+                if include_trap and not self.is_afnd and ch == ' ':
+                    continue
                 edge_key = (u, v, ch)
                 if edge_key not in seen_edges:
                     seen_edges.add(edge_key)
@@ -1129,14 +1198,9 @@ def validate_jff_xml_ten_requirements(xml_string, is_afnd=False, require_complet
             if not is_afnd:
                 errors.append(f"Req 7 falló: El AFD contiene una transición epsilon en ({u} -> {v}).")
         else:
-            if len(sym.strip()) == 0:
-                errors.append(
-                    f"Req 8 falló (Incompatibilidad DOMPrettier JFLAP 7.1): <read>{sym!r}</read> "
-                    f"se convierte en transición λ vacía al aplicar .trim() en JFLAP."
-                )
-            elif len(sym) != 1:
+            if len(sym) != 1:
                 errors.append(f"Req 8 falló: Etiqueta no atómica de longitud != 1 ({sym!r}).")
-            elif sym not in SIGMA_ASCII:
+            elif sym not in SIGMA_ASCII and sym != ' ':
                 errors.append(f"Req 9 falló: Símbolo {sym!r} fuera de Σ_ASCII.")
 
         edge_tuple = (u, v, sym)

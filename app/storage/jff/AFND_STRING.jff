@@ -57,6 +57,11 @@
     <transition>
       <from>4</from>
       <to>7</to>
+      <read> </read>
+    </transition>
+    <transition>
+      <from>4</from>
+      <to>7</to>
       <read>!</read>
     </transition>
     <transition>
