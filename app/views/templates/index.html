@@ -382,22 +382,37 @@
                 </div>
 
                 <!-- DIFERENCIACIÓN DE LOS 3 VEREDICTOS: LÉXICO, SEMÁNTICO Y GLOBAL DEL LOG (REQUISITO 9) -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                    <div id="card-verdict-lexical" class="rounded-lg border p-3.5 bg-slate-950 border-slate-800">
-                        <p class="text-[11px] uppercase font-bold text-slate-400">A. Reconocimiento Léxico (Autómata AFD/AFND)</p>
-                        <p id="sim-verdict-lexical-title" class="text-sm font-bold mt-1 font-mono">-</p>
-                        <p id="sim-verdict-lexical-detail" class="text-[11px] text-slate-300 mt-1 font-mono">-</p>
+                <!-- TARJETAS DE RESULTADOS: AFD, AFND, ANÁLISIS SINTÁCTICO, VALIDACIÓN SEMÁNTICA Y VEREDICTO GLOBAL -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div id="card-verdict-afd" class="rounded-lg border border-slate-800 bg-slate-950 p-3">
+                        <div class="text-slate-400 uppercase font-bold text-[10px]">
+                            Reconocimiento Léxico AFD (Token)
+                        </div>
+                        <div id="sim-afd-verdict-text" class="text-sm font-mono font-bold mt-1 text-emerald-400">—</div>
                     </div>
-                    <div id="card-verdict-semantic" class="rounded-lg border p-3.5 bg-slate-950 border-slate-800">
-                        <p class="text-[11px] uppercase font-bold text-slate-400">B. Validación Semántica del Token</p>
-                        <p id="sim-verdict-semantic-title" class="text-sm font-bold mt-1 font-mono">-</p>
-                        <p id="sim-verdict-semantic-detail" class="text-[11px] text-slate-300 mt-1 font-mono">-</p>
+
+                    <div id="card-verdict-afnd" class="rounded-lg border border-slate-800 bg-slate-950 p-3">
+                        <div class="text-slate-400 uppercase font-bold text-[10px]">
+                            Reconocimiento Léxico AFND (Token)
+                        </div>
+                        <div id="sim-afnd-verdict-text" class="text-sm font-mono font-bold mt-1 text-emerald-400">—</div>
                     </div>
-                    <div id="card-verdict-global" class="rounded-lg border p-3.5 bg-slate-950 border-slate-800">
-                        <p class="text-[11px] uppercase font-bold text-slate-400">C. Resultado Global del Log (Línea Completa)</p>
-                        <p id="sim-verdict-global-title" class="text-sm font-bold mt-1 font-mono">-</p>
-                        <p id="sim-verdict-global-detail" class="text-[11px] text-slate-300 mt-1 font-mono">-</p>
+
+                    <div id="card-verdict-global" class="rounded-lg border border-slate-800 bg-slate-950 p-3">
+                        <div class="text-slate-400 uppercase font-bold text-[10px]">
+                            Veredicto Global del Log y Fases
+                        </div>
+                        <div id="sim-global-verdict-text" class="text-sm font-mono font-bold mt-1 text-amber-300">—</div>
+                        <div id="sim-global-phases-breakdown" class="text-[11px] font-mono mt-1 text-slate-300"></div>
                     </div>
+                </div>
+
+                <!-- ADVERTENCIA DE VALIDACIÓN SEMÁNTICA (SOLO CUANDO AFD/AFND = True Y SEMÁNTICA DEL TOKEN = False) -->
+                <div id="sim-semantic-contrast-banner" class="hidden rounded-lg border border-amber-500/80 bg-amber-950/70 p-3.5 text-xs font-mono text-amber-100 space-y-1">
+                    <div id="sim-semantic-contrast-title" class="font-bold text-amber-300 uppercase">
+                        ⚠️ Validación semántica
+                    </div>
+                    <p id="sim-semantic-contrast-detail" class="text-amber-200"></p>
                 </div>
                 <!-- BANNER DE DIAGNÓSTICO EXACTO DE ERROR LÉXICO (ETAPA C - PRIORIDAD 3) -->
                 <div id="sim-error-diagnostic-banner" class="hidden rounded-lg border border-rose-500 bg-rose-950/80 p-3.5 text-xs font-mono text-rose-200 space-y-1">
@@ -920,44 +935,113 @@
                     }
                 }
 
-                // Tarjeta A: Reconocimiento Léxico del Token
-                const lexTitle = document.getElementById('sim-verdict-lexical-title');
-                const lexDetail = document.getElementById('sim-verdict-lexical-detail');
-                if (currentToken.lexical_accepted) {
-                    lexTitle.textContent = `✔ ACCEPT LÉXICO (${currentToken.afd.final_states_reached.join(', ')} ∈ F)`;
-                    lexTitle.className = 'text-sm font-bold mt-1 font-mono text-emerald-400';
-                    lexDetail.textContent = `AFD culmina en ${currentToken.afd.final_states_reached.join(', ')} y AFND en {${currentToken.afnd.final_states_reached.join(', ')}}.`;
-                } else {
-                    lexTitle.textContent = `✖ REJECT LÉXICO (Posición ${currentToken.afd.error_position || '-'})`;
-                    lexTitle.className = 'text-sm font-bold mt-1 font-mono text-rose-400';
-                    lexDetail.textContent = currentToken.afd.error_reason || 'Rechazado por el autómata.';
+                // Veredictos por fase para el token seleccionado. La estructura de este
+                // template utiliza currentToken (no las variables sim, afd y afnd).
+                const formatTriState = (val, trueText = 'True', falseText = 'False') => {
+                    if (val === true) return trueText;
+                    if (val === false) return falseText;
+                    return 'no evaluado';
+                };
+
+                const afd = currentToken.afd || {};
+                const afnd = currentToken.afnd || {};
+                const afdAcc = (typeof afd.accepted === 'boolean')
+                    ? afd.accepted
+                    : (afd.result === 'Accept' ? true : (afd.result === 'Reject' ? false : null));
+                const afndAcc = (typeof afnd.accepted === 'boolean')
+                    ? afnd.accepted
+                    : (afnd.result === 'Accept' ? true : (afnd.result === 'Reject' ? false : null));
+                // Si el backend proporciona el estado trivalente del token, respetarlo.
+                // En versiones anteriores, semantic_accepted era su campo equivalente.
+                const semanticSource = Object.prototype.hasOwnProperty.call(currentToken, 'token_sem_ok')
+                    ? currentToken.token_sem_ok : currentToken.semantic_accepted;
+                const rawSemanticMessage = currentToken.token_sem_msg || currentToken.semantic_message || '';
+                const isSecurityFinding = rawSemanticMessage.includes('Entrada sospechosa');
+                const tokenSemOk = (typeof semanticSource === 'boolean' && !isSecurityFinding)
+                    ? semanticSource : null;
+                const tokenSemMsg = rawSemanticMessage || 'no evaluado';
+                const tokenType = currentToken.tok_type || currentToken.token_type || currentToken.automaton_category || '';
+                const isEventType = tokenType === 'EVENT_TYPE';
+                const semTitle = currentToken.token_sem_title || (isEventType
+                    ? 'Validación semántica (Catálogo SBS 504-2021)'
+                    : 'Validación semántica');
+
+                const elAfdVerdict = document.getElementById('sim-afd-verdict-text');
+                if (elAfdVerdict) {
+                    elAfdVerdict.textContent = formatTriState(
+                        afdAcc,
+                        'Accept (True) — Token reconocido por AFD',
+                        `Reject (False) — Fallo léxico en pos ${afd.error_position ?? '?'}`
+                    );
+                    elAfdVerdict.className = afdAcc === true
+                        ? 'text-sm font-mono font-bold mt-1 text-emerald-400'
+                        : (afdAcc === false ? 'text-sm font-mono font-bold mt-1 text-rose-400' : 'text-sm font-mono font-bold mt-1 text-slate-400');
                 }
 
-                // Tarjeta B: Validación Semántica del Token
-                const semTitle = document.getElementById('sim-verdict-semantic-title');
-                const semDetail = document.getElementById('sim-verdict-semantic-detail');
-                if (currentToken.semantic_accepted) {
-                    semTitle.textContent = '✔ SEMÁNTICA DEL TOKEN VÁLIDA';
-                    semTitle.className = 'text-sm font-bold mt-1 font-mono text-emerald-400';
-                } else {
-                    semTitle.textContent = '✖ RECHAZO SEMÁNTICO DEL TOKEN';
-                    semTitle.className = 'text-sm font-bold mt-1 font-mono text-rose-400';
+                const elAfndVerdict = document.getElementById('sim-afnd-verdict-text');
+                if (elAfndVerdict) {
+                    elAfndVerdict.textContent = formatTriState(
+                        afndAcc,
+                        'Accept (True) — Token reconocido por AFND',
+                        `Reject (False) — Fallo léxico en pos ${afnd.error_position ?? '?'}`
+                    );
+                    elAfndVerdict.className = afndAcc === true
+                        ? 'text-sm font-mono font-bold mt-1 text-emerald-400'
+                        : (afndAcc === false ? 'text-sm font-mono font-bold mt-1 text-rose-400' : 'text-sm font-mono font-bold mt-1 text-slate-400');
                 }
-                semDetail.textContent = currentToken.semantic_message || '-';
 
-                // Tarjeta C: Veredicto Global del Log con desglose de fases (Prioridad 2)
-                const globTitle = document.getElementById('sim-verdict-global-title');
-                const globDetail = document.getElementById('sim-verdict-global-detail');
-                const phaseSummary = `Fases del Log → Léxica: ${currentToken.log_valid_lexical ? 'OK' : 'FALLO'} | Sintáctica: ${currentToken.log_valid_syntactic ? 'OK' : 'FALLO'} | Semántica: ${currentToken.log_valid_semantic ? 'OK' : 'FALLO'}`;
-                if (currentToken.log_is_valid) {
-                    globTitle.textContent = `✅ LOG LÍNEA #${currentToken.line}: ${currentToken.log_status || 'VÁLIDO'}`;
-                    globTitle.className = 'text-sm font-bold mt-1 font-mono text-emerald-400';
-                    globDetail.textContent = phaseSummary;
-                } else {
-                    globTitle.textContent = `❌ LOG LÍNEA #${currentToken.line}: ${currentToken.log_status || 'RECHAZADO'}`;
-                    globTitle.className = 'text-sm font-bold mt-1 font-mono text-rose-400';
-                    const firstErr = (currentToken.log_errors && currentToken.log_errors[0]) ? ` — ${currentToken.log_errors[0]}` : '';
-                    globDetail.textContent = phaseSummary + firstErr;
+                const elGlobalVerdict = document.getElementById('sim-global-verdict-text');
+                if (elGlobalVerdict) {
+                    const globalStatus = currentToken.log_status || 'no evaluado';
+                    const globalValid = (typeof currentToken.log_is_valid === 'boolean')
+                        ? currentToken.log_is_valid : null;
+                    elGlobalVerdict.textContent = `${globalStatus} (${formatTriState(globalValid, 'True', 'False')})`;
+                    elGlobalVerdict.className = globalValid === true
+                        ? 'text-sm font-mono font-bold mt-1 text-emerald-400'
+                        : (globalValid === false ? 'text-sm font-mono font-bold mt-1 text-rose-400' : 'text-sm font-mono font-bold mt-1 text-slate-400');
+                }
+
+                const elGlobalPhases = document.getElementById('sim-global-phases-breakdown');
+                if (elGlobalPhases) {
+                    const synState = Object.prototype.hasOwnProperty.call(currentToken, 'phase_syntactic_state')
+                        ? currentToken.phase_syntactic_state
+                        : ((currentToken.log_valid_lexical === true && typeof currentToken.log_valid_syntactic === 'boolean')
+                            ? currentToken.log_valid_syntactic : null);
+                    const tokSemLabel = formatTriState(tokenSemOk, 'True (Válido)', 'False (Rechazado)');
+                    const synLabel = formatTriState(synState, 'True (Válido)', 'False (Error)');
+                    elGlobalPhases.textContent =
+                        `Análisis sintáctico: ${synLabel} | ${semTitle} del token: ${tokSemLabel}`;
+                }
+
+                // El banner no depende del rechazo global: solo se muestra ante
+                // aceptación léxica de ambos modelos y rechazo semántico del token.
+                const elSemBanner = document.getElementById('sim-semantic-contrast-banner');
+                const elSemTitle = document.getElementById('sim-semantic-contrast-title');
+                const elSemDetail = document.getElementById('sim-semantic-contrast-detail');
+                if (elSemBanner && elSemTitle && elSemDetail) {
+                    const showSemanticWarning = (afdAcc === true && afndAcc === true && tokenSemOk === false);
+                    if (showSemanticWarning) {
+                        elSemBanner.classList.remove('hidden');
+                        elSemTitle.textContent = `⚠️ ${semTitle}`;
+                        const lexeme = currentToken.lexeme || '';
+                        const globalStatus = currentToken.log_status || 'no evaluado';
+                        if (isEventType) {
+                            elSemDetail.textContent =
+                                `El token ${lexeme} fue aceptado léxicamente por AFD y AFND (True), pero fue rechazado en la validación semántica del catálogo SBS 504-2021 (${tokenSemMsg}). El veredicto global del log es ${globalStatus}.`;
+                        } else if (tokenType === 'TIMESTAMP') {
+                            elSemDetail.textContent =
+                                `El token ${lexeme} cumple el formato léxico en AFD y AFND (True), pero fue rechazado en la validación semántica de calendario (${tokenSemMsg}). El veredicto global del log es ${globalStatus}.`;
+                        } else if (tokenType === 'IP') {
+                            elSemDetail.textContent =
+                                `El token ${lexeme} cumple el formato léxico en AFD y AFND (True), pero fue rechazado en la validación semántica de rango IPv4 (${tokenSemMsg}). El veredicto global del log es ${globalStatus}.`;
+                        } else {
+                            elSemDetail.textContent =
+                                `El token ${lexeme} fue aceptado léxicamente por AFD y AFND (True), pero fue rechazado en la validación semántica (${tokenSemMsg}). El veredicto global del log es ${globalStatus}.`;
+                        }
+                    } else {
+                        elSemBanner.classList.add('hidden');
+                        elSemDetail.textContent = '';
+                    }
                 }
 
                 // Actualizar Lienzo AFD

@@ -185,47 +185,66 @@ def _infer_expected_category_by_position(token_position_1based):
 
 def _attach_global_log_verdict(res_dict):
     """
-    Garantiza que TODOS los tokens de un registro (sea válido o rechazado por
-    error léxico, sintáctico, semántico o de seguridad) posean 'dynamic_simulation'
-    con los 6 campos del veredicto global sincronizados con el resultado del log.
+    Fase 3 (Etapa C - Prioridad 2):
+    Propaga el veredicto global del log y el estado individual de sus fases
+    (léxica, sintáctica, semántica y seguridad) a cada token dinámico,
+    distinguiendo True, False y None ('no evaluado') para la presentación.
     """
-    line_num = res_dict.get('line_number', 1)
-    valid_lex = bool(res_dict.get('valid_lexical', False))
-    valid_syn = bool(res_dict.get('valid_syntactic', False))
-    valid_sem = bool(res_dict.get('valid_semantic', False))
-    valid_sec = bool(res_dict.get('valid_security', False))
-    is_val = bool(res_dict.get('is_valid', False))
-    status_str = res_dict.get('status', '')
-    errs = list(res_dict.get('errors', []))
+    raw_lex = res_dict.get('valid_lexical')
+    raw_syn = res_dict.get('valid_syntactic')
+    raw_sem = res_dict.get('valid_semantic')
+
+    lex_state = raw_lex if isinstance(raw_lex, bool) else None
+    syn_state = (raw_syn if isinstance(raw_syn, bool) else None) if lex_state is True else None
+    sem_state = (raw_sem if isinstance(raw_sem, bool) else None) if (lex_state is True and syn_state is True) else None
 
     for t in res_dict.get('tokens', []):
-        if 'dynamic_simulation' not in t or not t['dynamic_simulation']:
-            cat_override = (
-                _infer_expected_category_by_position(t.get('index', 1))
-                if t.get('type') == 'ERROR_LEXICO' else None
-            )
-            t['dynamic_simulation'] = build_dynamic_lexeme_simulation_payload(
-                tok_type=t.get('type', 'ERROR_LEXICO'),
-                lexeme=t.get('value', ''),
-                line_number=t.get('line', line_num),
-                column=t.get('column', 1),
-                token_index=t.get('index', 1),
-                sem_ok=bool(t.get('sem_ok', False)),
-                sem_msg=t.get('sem_msg', ''),
-                valid_lexical_line=valid_lex,
-                target_category_override=cat_override
-            )
+        dyn = t.get('dynamic_simulation')
+        if dyn:
+            # Claves originales intactas (requeridas por las 61 pruebas)
+            dyn['log_status'] = res_dict['status']
+            dyn['log_is_valid'] = res_dict['is_valid']
+            dyn['log_valid_lexical'] = res_dict['valid_lexical']
+            dyn['log_valid_syntactic'] = res_dict['valid_syntactic']
+            dyn['log_valid_semantic'] = res_dict['valid_semantic']
+            dyn['log_valid_security'] = res_dict['valid_security']
+            dyn['log_errors'] = res_dict['errors']
 
-        dyn = t['dynamic_simulation']
-        dyn['valid_lexical_line'] = valid_lex
-        dyn['log_status'] = status_str
-        dyn['log_is_valid'] = is_val
-        dyn['log_valid_lexical'] = valid_lex
-        dyn['log_valid_syntactic'] = valid_syn
-        dyn['log_valid_semantic'] = valid_sem
-        dyn['log_valid_security'] = valid_sec
-        dyn['log_errors'] = errs
+            # Estados tri-valuados (True, False, None -> 'no evaluado') por fase
+            dyn['phase_lexical_state'] = lex_state
+            dyn['phase_syntactic_state'] = syn_state
+            dyn['phase_semantic_state'] = sem_state
 
+            afd_acc = dyn.get('afd', {}).get('accepted') if isinstance(dyn.get('afd'), dict) else None
+            afnd_acc = dyn.get('afnd', {}).get('accepted') if isinstance(dyn.get('afnd'), dict) else None
+            tok_type = t.get('type', '')
+            raw_tok_sem_ok = t.get('sem_ok')
+            raw_tok_sem_msg = str(t.get('sem_msg') or '')
+            is_security_alert = ("Entrada sospechosa" in raw_tok_sem_msg)
+
+            # Si el token falló en AFD/AFND o falta el dato booleano, su semántica es None ('no evaluado')
+            if tok_type == 'ERROR_LEXICO' or afd_acc is not True or afnd_acc is not True or not isinstance(raw_tok_sem_ok, bool):
+                dyn['token_sem_ok'] = None
+                dyn['token_sem_msg'] = 'no evaluado'
+            elif is_security_alert:
+                # Las alertas de seguridad (SQLi/XSS) no deben presentarse como advertencia semántica
+                dyn['token_sem_ok'] = True
+                dyn['token_sem_msg'] = raw_tok_sem_msg
+            else:
+                dyn['token_sem_ok'] = raw_tok_sem_ok
+                dyn['token_sem_msg'] = raw_tok_sem_msg
+
+            # Título general «Validación semántica», mencionando SBS 504-2021 solo en EVENT_TYPE
+            if tok_type == 'EVENT_TYPE':
+                dyn['token_sem_title'] = 'Validación semántica (Catálogo SBS 504-2021)'
+            elif tok_type == 'TIMESTAMP':
+                dyn['token_sem_title'] = 'Validación semántica (Calendario ISO-8601)'
+            elif tok_type == 'IP':
+                dyn['token_sem_title'] = 'Validación semántica (Rango IPv4 0..255)'
+            elif tok_type == 'NUMBER':
+                dyn['token_sem_title'] = 'Validación semántica (Rango numérico)'
+            else:
+                dyn['token_sem_title'] = 'Validación semántica'
     return res_dict
 
 
