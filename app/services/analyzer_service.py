@@ -10,6 +10,7 @@ from datetime import datetime
 from app.config import Config
 from app.models.token_model import TokenModel
 from app.patterns.singleton.grammar_singleton import GrammarSingleton
+from app.services.automata_engine import TOKEN_FORMAL_REGEX_AST_SPECS
 from app.services.jflap_service import (
     build_master_automata_catalog,
     simulate_token_both_traces,
@@ -247,7 +248,170 @@ def _attach_global_log_verdict(res_dict):
                 dyn['token_sem_title'] = 'Validación semántica'
     return res_dict
 
+# Agregar en app/services/analyzer_service.py (junto a los helpers de presentación)
 
+ACADEMIC_LEXICAL_TABLE_SPECS = [
+    {
+        'token': 'TIMESTAMP',
+        'agrupador': 'Marca de Tiempo ISO-8601',
+        'regex_notation': r'[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]',
+        'formal_engine_regex': '[0..9][0..9][0..9][0..9]-(0[1..9]|1[0..2])-(0[1..9]|[1..2][0..9]|3[0..1])T([0..1][0..9]|2[0..3]):[0..5][0..9]:[0..5][0..9]',
+        'language_notation': (
+            'L(TIMESTAMP) = Lenguaje regular del formato léxico ISO-8601 acotado por posición '
+            '(la existencia real de la fecha en el calendario gregoriano y años bisiestos se '
+            'verifica en la Validación Semántica).'
+        ),
+        'set_notation': (
+            '{ y1y2y3y4-m1m2-d1d2Th1h2:n1n2:s1s2 ∈ Σ_ASCII^19 | '
+            'yi ∈ {0..9}, m1m2 ∈ {01..12}, d1d2 ∈ {01..31}, h1h2 ∈ {00..23}, n1n2, s1s2 ∈ {00..59} }'
+        ),
+    },
+    {
+        'token': 'IP',
+        'agrupador': 'Dirección de Red IPv4',
+        'regex_notation': r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}',
+        'formal_engine_regex': '[0..9]([0..9]([0..9])?)?\\.[0..9]([0..9]([0..9])?)?\\.[0..9]([0..9]([0..9])?)?\\.[0..9]([0..9]([0..9])?)?',
+        'language_notation': (
+            'L(IP) = Lenguaje regular de cuatro bloques de 1 a 3 dígitos decimales separados por punto '
+            '(el rango aritmético 0 ≤ octeto ≤ 255 y el rechazo de ceros iniciales como 001 se '
+            'verifican en la Validación Semántica).'
+        ),
+        'set_notation': (
+            '{ x1.x2.x3.x4 ∈ (D ∪ {.})* | D = {0..9} ∧ ∀i ∈ {1,2,3,4}, xi ∈ D^k con 1 ≤ k ≤ 3 }'
+        ),
+    },
+    {
+        'token': 'SEVERITY',
+        'agrupador': 'Nivel de Severidad SOC',
+        'regex_notation': r'INFO|WARNING|ERROR|CRITICAL',
+        'formal_engine_regex': 'INFO|WARNING|ERROR|CRITICAL',
+        'language_notation': 'L(SEVERITY) = Lenguaje regular finito de niveles de criticidad admitidos por el SOC.',
+        'set_notation': '{ w ∈ Σ_L* | w ∈ {"INFO", "WARNING", "ERROR", "CRITICAL"} }',
+    },
+    {
+        'token': 'EVENT_TYPE',
+        'agrupador': 'Identificador de Tipo de Evento',
+        'regex_notation': r'[A-Z][A-Z]*(_[A-Z][A-Z]*)*',
+        'formal_engine_regex': '[A..Z][A..Z]*(_[A..Z][A..Z]*)*',
+        'language_notation': (
+            'L(EVENT_TYPE) = Identificadores alfabéticos en mayúsculas separados por guion bajo simple '
+            '(la pertenencia al catálogo normativo SBS N.° 504-2021 se verifica en la Validación Semántica).'
+        ),
+        'set_notation': (
+            '{ u1_u2_..._uk ∈ (Σ_L ∪ {_})+ | k ≥ 1 ∧ ∀i ∈ {1..k}, ui ∈ Σ_L+ con Σ_L = {A, B, ..., Z} }'
+        ),
+    },
+    {
+        'token': 'STRING',
+        'agrupador': 'Literal de Cadena JSON',
+        'regex_notation':grammar.TOKEN_METADATA['STRING']['regex'],
+        'formal_engine_regex': TOKEN_FORMAL_REGEX_AST_SPECS.get('STRING', ''),
+        'language_notation': (
+            'L(STRING) = Cadenas de caracteres ASCII imprimibles delimitadas por comillas dobles '
+            'con soporte de secuencias de escape JSON.'
+        ),
+        'set_notation': (
+            '{ "w" | w ∈ (Σ_base ∪ { \\c | c ∈ {", \\, /, b, f, n, r, t} })*, '
+            'donde Σ_base = Σ_ASCII(32..126) \\ {", \\} }'
+        ),
+    },
+    {
+        'token': 'NUMBER',
+        'agrupador': 'Constante Entera No Negativa',
+        'regex_notation': r'0|[1-9][0-9]*',
+        'formal_engine_regex': '0|[1..9][0..9]*',
+        'language_notation': (
+            'L(NUMBER) = Números enteros no negativos en base 10 sin ceros iniciales superfluos '
+            '(rechaza léxicamente cadenas como 007).'
+        ),
+        'set_notation': (
+            '{ "0" } ∪ { d1d2...dk ∈ D+ | k ≥ 1 ∧ d1 ∈ {1..9} ∧ ∀j ∈ {2..k}, dj ∈ {0..9} }'
+        ),
+    },
+    {
+        'token': 'LBRACE',
+        'agrupador': 'Delimitador Apertura JSON',
+        'regex_notation': r'\{',
+        'formal_engine_regex': '{',
+        'language_notation': 'L(LBRACE) = Lenguaje unitario del símbolo de apertura de objeto JSON (PUSH en PDA sintáctico).',
+        'set_notation': '{ w ∈ Σ_ASCII* | w = "{" }',
+    },
+    {
+        'token': 'RBRACE',
+        'agrupador': 'Delimitador Cierre JSON',
+        'regex_notation': r'\}',
+        'formal_engine_regex': '}',
+        'language_notation': 'L(RBRACE) = Lenguaje unitario del símbolo de cierre de objeto JSON (POP en PDA sintáctico).',
+        'set_notation': '{ w ∈ Σ_ASCII* | w = "}" }',
+    },
+    {
+        'token': 'COLON',
+        'agrupador': 'Separador Clave-Valor JSON',
+        'regex_notation': r':',
+        'formal_engine_regex': ':',
+        'language_notation': 'L(COLON) = Lenguaje unitario del separador entre clave y valor en un miembro JSON.',
+        'set_notation': '{ w ∈ Σ_ASCII* | w = ":" }',
+    },
+    {
+        'token': 'COMMA',
+        'agrupador': 'Separador de Campos JSON',
+        'regex_notation': r',',
+        'formal_engine_regex': ',',
+        'language_notation': 'L(COMMA) = Lenguaje unitario del separador entre pares clave-valor consecutivos.',
+        'set_notation': '{ w ∈ Σ_ASCII* | w = "," }',
+    },
+]
+
+
+def build_academic_lexical_table(results):
+    """
+    Construye la tabla académica de la Sección B — 2.1 Análisis Léxico para las 10 categorías
+    reales del proyecto, extrayendo los lexemas exclusivamente de los logs que analizó el usuario
+    en la ejecución actual (sin insertar ejemplos fijos como resultados dinámicos).
+    """
+    observed_by_token = {spec['token']: [] for spec in ACADEMIC_LEXICAL_TABLE_SPECS}
+
+    for log_res in (results or []):
+        if not isinstance(log_res, dict):
+            continue
+        for tok in log_res.get('tokens', []):
+            if not isinstance(tok, dict):
+                continue
+            t_type = tok.get('type')
+            t_val = tok.get('value')
+            if t_type in observed_by_token and isinstance(t_val, str):
+                dyn = tok.get('dynamic_simulation')
+                afd_ok = dyn.get('afd', {}).get('accepted') if isinstance(dyn, dict) else True
+                if afd_ok is not False:
+                    observed_by_token[t_type].append(t_val)
+
+    table_rows = []
+    for spec in ACADEMIC_LEXICAL_TABLE_SPECS:
+        tok_name = spec['token']
+        all_lexemes = observed_by_token[tok_name]
+        unique_lexemes = []
+        for lx in all_lexemes:
+            if lx not in unique_lexemes:
+                unique_lexemes.append(lx)
+
+        table_rows.append({
+            'token': tok_name,
+            'agrupador': spec['agrupador'],
+            'lexemes_list': unique_lexemes,
+            'lexemes_all': all_lexemes,
+            'occurrences_count': len(all_lexemes),
+            'has_dynamic_lexemes': len(all_lexemes) > 0,
+            'lexemes_display': (
+                ', '.join(unique_lexemes)
+                if unique_lexemes
+                else 'Sin ocurrencias en los logs analizados'
+            ),
+            'regex_notation':grammar.TOKEN_METADATA[tok_name]['regex'],
+            'formal_engine_regex': TOKEN_FORMAL_REGEX_AST_SPECS.get(tok_name, spec['formal_engine_regex']),
+            'language_notation': spec['language_notation'],
+            'set_notation': spec['set_notation'],
+        })
+    return table_rows
 def analyze_single_log(log_line, line_number=1):
     tokens = []
     lexical_errors = []
@@ -897,7 +1061,8 @@ def analyze_logs_input(raw_input, run_id=None, persist_reports=False, is_demo=Fa
             'has_analyzed': False,
             'is_demo': False,
             'dynamic_lexemes_by_type': {tok_t: [] for tok_t in MASTER_AUTOMATA_CATALOG},
-            'all_dynamic_tokens': []
+            'all_dynamic_tokens': [],
+            'academic_lexical_table':build_academic_lexical_table([])
         }
 
     all_lines = [line.strip() for line in raw_input.splitlines() if line.strip()]
@@ -964,5 +1129,6 @@ def analyze_logs_input(raw_input, run_id=None, persist_reports=False, is_demo=Fa
         'is_demo': is_demo,
         'audit_summary': audit_summary,
         'dynamic_lexemes_by_type': dynamic_lexemes_by_type,
-        'all_dynamic_tokens': all_dynamic_tokens
+        'all_dynamic_tokens': all_dynamic_tokens,
+        'academic_lexical_table':build_academic_lexical_table(results)
     }

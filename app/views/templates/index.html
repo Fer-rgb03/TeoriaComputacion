@@ -86,6 +86,32 @@
             ⚠️ <strong>ADVERTENCIA DE LOTE PARCIAL (TRUNCAJE ACTIVO):</strong> Se recibieron <strong>{{ summary.total_received }}</strong> líneas, se procesaron las primeras <strong>{{ summary.total_lines }}</strong> y se descartaron <strong>{{ summary.discarded_lines }}</strong> líneas por superar el límite máximo de 200 líneas por lote.
         </div>
         {% endif %}
+<!-- A) CASO — requisitos académicos del curso -->
+        <section id="academico-caso" class="rounded-xl border border-sky-700 bg-slate-900 p-5 shadow-lg space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-extrabold tracking-wider text-sky-300">A) CASO — PROCESO DE MONITOREO SOC</p>
+                    <h2 class="mt-1 text-lg font-bold text-white">Analizador léxico, sintáctico y semántico de registros de seguridad</h2>
+                </div>
+                <a href="#academico-proceso" class="rounded border border-emerald-700 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-950">Ver B) Proceso interno ↓</a>
+            </div>
+            <p class="text-sm text-slate-300">Caso académico de preparación de logs para su revisión por un analista del Centro de Operaciones de Seguridad (SOC). El sistema valida registros estructurados; no equivale a un SIEM completo ni demuestra detección de intrusiones reales.</p>
+            <div class="grid md:grid-cols-3 gap-3 text-xs">
+                <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <h3 class="font-bold text-sky-300 mb-1">Entrada</h3>
+                    <p class="text-slate-300">Registro escrito en la consola o archivo <code>.txt</code> / <code>.log</code>; estructura: <code>TIMESTAMP IP SEVERITY EVENT_TYPE PAYLOAD</code>.</p>
+                </div>
+                <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <h3 class="font-bold text-amber-300 mb-1">Procesamiento</h3>
+                    <p class="text-slate-300">Léxico: 10 categorías con ER, AFND y AFD. Sintáctico: gramática y pila para payload JSON. Semántico: fechas, IPv4, eventos permitidos y reglas de entrada.</p>
+                </div>
+                <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <h3 class="font-bold text-emerald-300 mb-1">Salida</h3>
+                    <p class="text-slate-300">Diagnósticos por fase, tokens, árboles, simulación formal, tablas de transición, archivos JFLAP <code>.jff</code> y reportes de sesión.</p>
+                </div>
+            </div>
+            <a href="#log_input" class="text-xs text-sky-300 underline">Ir al ingreso de logs</a>
+        </section>
 
         <!-- RESUMEN EJECUTIVO Y VALOR DE NEGOCIO -->
         <section class="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-lg relative overflow-hidden">
@@ -215,7 +241,122 @@
                 </div>
             </form>
         </section>
+<!-- B) PROCESO INTERNO — Visión académica visible y basada en motor real -->
+        <section id="academico-proceso" class="rounded-xl border border-emerald-700/70 bg-slate-900 p-5 shadow-lg space-y-5">
+            <div>
+                <p class="text-xs font-bold tracking-wider text-emerald-300">B) PROCESO INTERNO</p>
+                <h2 class="text-lg font-bold text-white mt-1">2.1 Análisis Léxico</h2>
+                <p class="text-xs text-slate-400 mt-1">Los lexemas se obtienen del lote analizado. La expresión regular proviene de la gramática de producción y se presenta junto con su lenguaje y definición por conjuntos. Las reglas semánticas se evalúan después.</p>
+                {% if is_demo %}
+                <p class="mt-2 text-xs text-amber-300">Vista inicial: lexemas de demostración, no datos ingresados por el usuario.</p>
+                {% endif %}
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-slate-700">
+                <table id="tabla-academica-lexica" class="w-full min-w-[900px] border-collapse text-xs text-left">
+                    <thead>
+                        <tr class="bg-slate-800 text-white border-b border-slate-600">
+                            <th rowspan="2" class="p-3 border-r border-slate-700">Token (agrupador)</th>
+                            <th rowspan="2" class="p-3 border-r border-slate-700">Lexemas de los logs</th>
+                            <th rowspan="2" class="p-3 border-r border-slate-700">Notación Regex</th>
+                            <th colspan="2" class="p-3 text-center">Expresiones regulares — Notación por conjuntos</th>
+                        </tr>
+                        <tr class="bg-slate-800 text-slate-200">
+                            <th class="p-2 border-r border-slate-700">Lenguaje</th>
+                            <th class="p-2">Notación por conjuntos</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% for row in academic_lexical_table %}
+                        <tr data-academic-token="{{ row.token }}" class="hover:bg-slate-800/60">
+                            <td class="align-top p-3 border-r border-slate-800">
+                                <strong class="text-emerald-300 font-mono">{{ row.token }}</strong>
+                                <p class="text-[10px] text-slate-400 mt-1">{{ row.agrupador }}</p>
+                            </td>
+                            <td class="align-top p-3 border-r border-slate-800">
+                                {% if row.has_dynamic_lexemes %}
+                                    <div class="flex flex-wrap gap-1">
+                                        {% for lx in row.lexemes_list %}
+                                            <code class="px-1.5 py-1 rounded bg-slate-950 text-amber-200 break-all">{{ lx }}</code>
+                                        {% endfor %}
+                                    </div>
+                                    <p class="mt-1 text-[10px] text-slate-500">{{ row.occurrences_count }} ocurrencia(s)</p>
+                                {% else %}
+                                    <span class="text-slate-500 italic">Sin ocurrencias en este lote</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-top p-3 border-r border-slate-800 font-mono text-sky-300 break-all"><code>{{ row.regex_notation }}</code></td>
+                            <td class="align-top p-3 border-r border-slate-800 text-slate-200">{{ row.language_notation }}</td>
+                            <td class="align-top p-3 font-mono text-violet-200 break-words">{{ row.set_notation }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="border-t border-slate-700 pt-4 space-y-3">
+                <h2 id="academico-maquinas" class="text-lg font-bold text-white">2.2 Máquinas Abstractas</h2>
+                <p class="text-xs text-slate-300">Construcción académica: <strong class="text-amber-300">ER → AFND (Thompson) → AFD (Subconjuntos)</strong>. Los modelos se generan del mismo motor formal que usa el simulador. Como ejemplo visible se presenta <code>NUMBER</code>; el catálogo incluye las 10 categorías.</p>
+                <p class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-mono text-sky-300"><strong>ER(NUMBER):</strong> {{ academic_lexical_table[5].formal_engine_regex }}</p>
+                {% set academic_number = master_catalog.get('NUMBER') %}
+                {% if academic_number %}
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div class="overflow-hidden rounded-lg bg-white border border-sky-600">
+                        <h3 class="bg-sky-800 px-3 py-2 text-white text-xs font-bold">Paso 1: AFND-ε de Thompson — NUMBER</h3>
+                        <p class="bg-slate-200 px-3 py-2 text-[11px] font-mono text-slate-900">Q' = {{ academic_number.quintupla_afnd.Q }} | {{ academic_number.quintupla_afnd.Sigma }} | q₀ = {{ academic_number.quintupla_afnd.q_ini }} | F' = {{ academic_number.quintupla_afnd.F }}</p>
+                        {{ academic_number.jflap_afnd_svg | safe }}
+                    </div>
+                    <div class="overflow-hidden rounded-lg bg-white border border-amber-600">
+                        <h3 class="bg-amber-700 px-3 py-2 text-white text-xs font-bold">Paso 2: AFD por Subconjuntos — NUMBER</h3>
+                        <p class="bg-slate-200 px-3 py-2 text-[11px] font-mono text-slate-900">Q = {{ academic_number.quintupla_afd.Q }} | {{ academic_number.quintupla_afd.Sigma }} | q₀ = {{ academic_number.quintupla_afd.q_ini }} | F = {{ academic_number.quintupla_afd.F }}</p>
+                        {{ academic_number.jflap_afd_svg | safe }}
+                    </div>
+                </div>
+                {% endif %}
+                <h2 id="academico-transiciones" class="text-lg font-bold text-white">2.3 Tablas de Transiciones y Catálogo de Autómatas</h2>
+                <p class="text-xs text-slate-300">
+    Las tablas δ' (AFND) y δ (AFD) están debajo de cada diagrama anterior,
+    generadas automáticamente por el motor formal.
+    Incluyen el estado inicial (→), los estados finales (*)
+    y botones para descargar archivos <code>.jff</code>
+    para su validación en JFLAP.
+    La compatibilidad con la versión estándar de JFLAP 7.1
+    todavía está pendiente de verificación.</p>
+                <!-- AVISO DE COMPATIBILIDAD JFLAP -->
+<div class="rounded-lg border border-sky-500/70 bg-sky-950/40
+            p-4 space-y-2 text-sm">
 
+    <h3 class="font-bold text-sky-300">
+        ℹ️ Aviso de compatibilidad con JFLAP 7.1
+    </h3>
+
+    <p class="text-slate-200">
+        Los automatas AFD y AFND han sido verificados
+        mediante pruebas formales y simulaciones
+        en un entorno JFLAP 7.1 corregido.
+    </p>
+
+    <p class="text-slate-300">
+        Actualmente, algunos archivos .jff pueden presentar
+        problemas de compatibilidad durante su simulacion
+        en la version estandar de JFLAP 7.1.
+    </p>
+
+    <p class="text-amber-300 font-semibold">
+        Estamos trabajando en mejorar la interoperabilidad
+        y desarrollar una solucion de exportacion y ejecucion
+        reproducible para JFLAP 7.1 estandar.
+    </p>
+
+    <p class="text-emerald-300 text-xs">
+        Las simulaciones integradas de SOC Analyzer
+        continuan disponibles y se verifican mediante
+        el motor formal del proyecto.
+    </p>
+
+</div>
+                <button type="button" onclick="switchMainTab('tab-catalogo-jflap'); document.getElementById('tab-catalogo-jflap').scrollIntoView({behavior:'smooth',block:'start'});"
+                        class="rounded bg-sky-700 hover:bg-sky-600 px-4 py-2 text-white text-xs font-bold">Abrir catálogo de los 10 autómatas y sus transiciones</button>
+            </div>
+        </section>
         <!-- TARJETAS DE RESUMEN -->
         <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -293,7 +434,6 @@
                             <thead>
                                 <tr class="bg-slate-800 text-slate-200 uppercase">
                                     <th class="p-2.5 border border-slate-700">#</th>
-                                    <th class="p-2.5 border border-slate-700">Posición</th>
                                     <th class="p-2.5 border border-slate-700">Token</th>
                                     <th class="p-2.5 border border-slate-700">Lexema</th>
                                     <th class="p-2.5 border border-slate-700">Traza Real de Simulación (AFD / AFND)</th>
@@ -306,7 +446,6 @@
                                 {% set t_uid = 'L' ~ tok.line ~ '_T' ~ tok.index %}
                                 <tr class="{% if tok.type == 'ERROR_LEXICO' %}bg-rose-950/60{% else %}hover:bg-slate-800/40{% endif %}">
                                     <td class="p-2.5 border border-slate-800 font-mono text-slate-400">{{ tok.index }}</td>
-                                    <td class="p-2.5 border border-slate-800 font-mono text-slate-300 whitespace-nowrap">L{{ tok.line }}:C{{ tok.column }}</td>
                                     <td class="p-2.5 border border-slate-800 font-bold font-mono {% if tok.type == 'ERROR_LEXICO' %}text-rose-400{% else %}text-emerald-400{% endif %}">{{ tok.type }}</td>
                                     <td class="p-2.5 border border-slate-800 font-mono text-amber-300">{{ tok.value }}</td>
                                     <td class="p-2.5 border border-slate-800 font-mono text-[11px] text-slate-300">{{ tok.live_trace }}</td>
@@ -621,7 +760,6 @@
                         <table class="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr class="bg-slate-800 text-slate-200">
-                                    <th class="p-2 border border-slate-700">Posición</th>
                                     <th class="p-2 border border-slate-700">Lexema Real Analizado</th>
                                     <th class="p-2 border border-slate-700">Resultado Léxico (AFD/AFND)</th>
                                     <th class="p-2 border border-slate-700">Validación Semántica</th>
@@ -632,7 +770,6 @@
                             <tbody>
                                 {% for item in cat_live_list %}
                                 <tr>
-                                    <td class="p-2 border border-slate-800 font-mono text-slate-400">L{{ item.line }}:C{{ item.column }} (#{{ item.token_index }})</td>
                                     <td class="p-2 border border-slate-800 font-mono text-amber-300 font-bold">{{ item.lexeme }}</td>
                                     <td class="p-2 border border-slate-800 font-bold {% if item.lexical_accepted %}text-emerald-400{% else %}text-rose-400{% endif %}">
                                         {{ item.afd.result }} (Final: {{ item.afd.final_states_reached | join(', ') }})
