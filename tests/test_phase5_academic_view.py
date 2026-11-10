@@ -85,10 +85,13 @@ class TestAcademicView(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         page = response.get_data(as_text=True)
         for label in ('A) CASO', 'B) PROCESO INTERNO', '2.1 Análisis Léxico',
-                      '2.2 Máquinas Abstractas', '2.3 Tabla de Transiciones',
+                      '2.2 Máquinas Abstractas', '2.3 Tablas de Transiciones y Catálogo de Autómatas',
                       'data-academic-token="NUMBER"'):
-            self.assertIn(label, page)
-        self.assertNotIn('>Posición</th>', page)
+            self.assertTrue(label in page, f"No se encontro en el HTML: {label}")
+        self.assertTrue(
+            '>Posición</th>' not in page,
+            "La columna Posicion todavia aparece en el HTML"
+        )
 
     def test_08_automata_downloads_and_error_positions_retained(self):
         data = analyze_logs_input(GOOD)
