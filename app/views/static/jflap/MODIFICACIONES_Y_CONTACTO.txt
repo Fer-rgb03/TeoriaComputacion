@@ -1,0 +1,23 @@
+JFLAP 7.1 — Distribución modificada de diagnóstico (NO OFICIAL)
+
+Adaptación experimental realizada con ayuda de ChatGPT para pruebas académicas de SOC Analyzer.
+Comparación binaria frente al JFLAP 7.1 original aportado: de 1163 entradas del JAR,
+solo cambia automata/fsa/FSAStepWithClosureSimulator.class.
+Motivo: facilitar la interpretación de caracteres literales y clases/rangos de caracteres
+en la simulación de autómatas exportados.
+
+Referencia del proyecto: https://github.com/Fer-rgb03/TeoriaComputacion
+Contacto del responsable del proyecto: https://github.com/Fer-rgb03/TeoriaComputacion/issues
+
+IMPORTANTE: la licencia JFLAP exige incluir su texto, prohíbe la distribución comercial
+y requiere poder entregar los cambios, incluido el código fuente, al mantenedor si lo solicita.
+Esta nota NO reemplaza la disponibilidad del código fuente. El responsable debe conservar
+y poder facilitar la implementación fuente de la clase modificada antes de distribuir públicamente.
+
+=== FUENTE DISPONIBLE DEL PARCHE (2026-11-13) ===
+El archivo FSAStepWithClosureSimulator.java se distribuye junto al JAR modificado.
+La licencia de JFLAP 7.1 (27-07-2018) se proporciona además como LICENSE_JFLAP_2018.txt.
+Comprobación: la clase compilada desde el código fuente usando javac --release 8
+tiene SHA-256 299908387fe99a00d521d032e9a811c8e89dafbdf970ec29f10307a00bf9de11,
+idéntico al bytecode dentro del JAR modificado.
+Proyecto/contacto: https://github.com/Fer-rgb03/TeoriaComputacion/issues

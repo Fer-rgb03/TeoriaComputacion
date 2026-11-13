@@ -482,6 +482,21 @@
                     todavía está pendiente de verificación.
                 </p>
 
+                <!-- SOC-INTEGRACION-JFLAP-COMPLETO-20261113 -->
+                <div class="rounded-lg border border-emerald-600/70 bg-emerald-950/20 p-4 space-y-2 text-sm">
+                    <p class="font-bold text-emerald-300">Descargas académicas completas — AFD con estado trampa qT</p>
+                    <p class="text-slate-200">Los 10 AFD se descargan con qT y transiciones completas; los 10 AFND conservan la construcción de Thompson. Para ejecutar estos archivos recomendamos el JFLAP 7.1 modificado de diagnóstico (no oficial). Java 8 se instala localmente, no en Railway.</p>
+                    <div class="flex flex-wrap gap-3">
+                        <a href="{{ url_for('static', filename='jff_completos/SOC_JFF_COMPLETOS.zip') }}" download="SOC_JFF_COMPLETOS.zip" class="px-3 py-2 rounded bg-amber-400 text-slate-950 font-bold">⬇ Descargar 20 autómatas completos (.zip)</a>
+                        <a href="{{ url_for('static', filename='jflap/JFLAP7.1_CORREGIDO_DIAGNOSTICO.jar') }}" download="JFLAP7.1_CORREGIDO_DIAGNOSTICO.jar" class="px-3 py-2 rounded bg-sky-600 text-white font-bold">⬇ Descargar JFLAP corregido (.jar)</a>
+                        <a href="{{ url_for('static', filename='jflap/LICENSE_JFLAP_2018.txt') }}" download="LICENSE_JFLAP_2018.txt" class="px-3 py-2 rounded border border-slate-500 text-slate-200">Licencia de JFLAP</a>
+                        <a href="{{ url_for('static', filename='jflap/MODIFICACIONES_Y_CONTACTO.txt') }}" download="MODIFICACIONES_Y_CONTACTO.txt" class="px-3 py-2 rounded border border-slate-500 text-slate-200">Cambios y contacto</a>
+                        <!-- SOC-FUENTE-VERIFICADA-20261113 -->
+                        <a href="{{ url_for('static', filename='jflap/FSAStepWithClosureSimulator.java') }}" download="FSAStepWithClosureSimulator.java" class="px-3 py-2 rounded border border-slate-500 text-slate-200">Código fuente del parche (.java)</a>
+                        <a href="{{ url_for('static', filename='jflap/NOTA_FUENTE_Y_LICENCIA.txt') }}" download="NOTA_FUENTE_Y_LICENCIA.txt" class="px-3 py-2 rounded border border-slate-500 text-slate-200">Detalles de licencia y trazabilidad</a>
+                    </div>
+                    <p class="text-amber-300 text-xs">Compatibilidad: los AFD completos con muchas transiciones no muestran resultados en algunas ejecuciones de JFLAP 7.1 estándar. Utilizar la versión corregida incluida. No es una versión oficial.</p>
+                </div>
                 <!-- AVISO DE COMPATIBILIDAD JFLAP -->
                 <div class="rounded-lg border border-sky-500/70 bg-sky-950/40 p-4 space-y-2 text-sm">
                     <h3 class="font-bold text-sky-300">

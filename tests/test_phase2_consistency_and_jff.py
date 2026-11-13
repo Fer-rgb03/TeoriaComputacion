@@ -89,25 +89,23 @@ class TestPhase2ConsistencyAndJFF(unittest.TestCase):
             self.assertEqual(q_afnd['Q'], "{" + ", ".join(jff_ids_afnd) + "}")
 
     def test_03_embedded_base64_download_uri_matches_exported_jff_file_byte_for_byte(self):
-        """Verifica que el URI Base64 del botón de descarga coincida byte a byte con el archivo .jff."""
-        for tok, (path_afd, path_afnd) in self.generated_files.items():
+        """Contrato actualizado: botones enlazan JFF completos estáticos (sin datos Base64)."""
+        from pathlib import Path
+        static_dir = Path('app/views/static/jff_completos')
+        for tok, (_path_afd, _path_afnd) in self.generated_files.items():
             afd_html, afnd_html, *_ = build_jflap_models_for_token(tok)
-
-            m_afd = re.search(r'href="data:application/xml;base64,([^"]+)"', afd_html)
-            m_afnd = re.search(r'href="data:application/xml;base64,([^"]+)"', afnd_html)
-            self.assertIsNotNone(m_afd)
-            self.assertIsNotNone(m_afnd)
-
-            decoded_afd_xml = base64.b64decode(m_afd.group(1)).decode('utf-8')
-            decoded_afnd_xml = base64.b64decode(m_afnd.group(1)).decode('utf-8')
-
-            with open(path_afd, "r", encoding="utf-8") as f1:
-                disk_afd_xml = f1.read()
-            with open(path_afnd, "r", encoding="utf-8") as f2:
-                disk_afnd_xml = f2.read()
-
-            self.assertEqual(decoded_afd_xml, disk_afd_xml)
-            self.assertEqual(decoded_afnd_xml, disk_afnd_xml)
+            for kind, rendered in (('AFD', afd_html), ('AFND', afnd_html)):
+                file_name = f'{kind}_{tok}.jff'
+                self.assertIn(f'href="/static/jff_completos/{file_name}"', rendered)
+                content = (static_dir / file_name).read_text(encoding='utf-8')
+                states, transitions = parse_jff_xml_to_automaton(content)
+                self.assertTrue(states and transitions)
+                names = {state['id'] for state in states}
+                if kind == 'AFD':
+                    self.assertIn('qT', names)
+                else:
+                    self.assertNotIn('qT', names)
+        self.assertIn('<read> </read>', (static_dir / 'AFD_STRING.jff').read_text(encoding='utf-8'))
 
     def test_04_structured_simulation_matches_loaded_jff_on_random_valid_and_invalid_corpus(self):
         """Compara resultados sobre un corpus aleatorio reproducible entre el simulador y el .jff."""

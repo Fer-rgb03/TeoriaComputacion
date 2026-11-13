@@ -1,0 +1,39 @@
+SOC Analyzer — Fuentes de la modificación JFLAP 7.1 (NO OFICIAL)
+================================================================
+
+Contenido adicional de la distribución:
+- FSAStepWithClosureSimulator.java: fuente de la única clase modificada.
+- LICENSE_JFLAP_2018.txt: transcripción de la licencia oficial publicada el 27-07-2018.
+- MODIFICACIONES_Y_CONTACTO.txt: responsable y contacto (conservado en el proyecto).
+
+Fuente oficial de licencia: https://www.jflap.org/jflaptmp/july27-18/license.html
+Proyecto y contacto público: https://github.com/Fer-rgb03/TeoriaComputacion/issues
+JFLAP oficial: https://www.jflap.org/
+
+Comprobaciones independientes del paquete del usuario (13-11-2026):
+- Original JFLAP7.1.jar vs JFLAP7.1_CORREGIDO_DIAGNOSTICO.jar:
+  1163 entradas en ambos; una única clase diferente:
+  automata/fsa/FSAStepWithClosureSimulator.class
+- Compilación de FSAStepWithClosureSimulator.java con javac --release 8
+  usando el JAR corregido como classpath: bytecode SHA256 exactamente igual
+  al de la clase del JAR modificado (ver manifiesto).
+- Conserva original JFLAP7.1.jar; la modificación es distribuida separadamente.
+
+IMPORTANTE:
+JFLAP no es software oficial del proyecto SOC Analyzer. Esta edición no es
+una versión oficial de JFLAP ni está respaldada por Duke University.
+La licencia impide cobrar por un producto que incorpore JFLAP y obliga a
+facilitar las modificaciones, incluido su fuente, al mantenedor a petición.
+La redistribución exige incluir la licencia y un medio de contacto de
+quien realizó los cambios. Para incidencias de esta adaptación, utilizar el
+repositorio indicado, no atribuir respaldo a los autores de JFLAP.
+
+La licencia de 2018 se incorpora como archivo adicional. La copia de 2009
+existente en el JAR histórico no se modifica para preservar su integridad.
+Conviene cotejar el texto de 2018 con el enlace oficial antes de publicación.
+
+AVISO FUNCIONAL:
+Los autómatas AFD completos con estado qT presentan limitaciones de
+visualización/simulación en algunas versiones estándar de JFLAP 7.1.
+Recomendamos el JAR modificado para reproducir los ensayos; la existencia
+de fuente de la modificación no implica compatibilidad universal.

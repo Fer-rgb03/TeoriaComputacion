@@ -165,13 +165,11 @@ def render_transition_table_html(states, transitions, is_afnd=False, tok_type="T
 
     # El botón de descarga entrega el AFD ligero (include_trap=False) para compatibilidad con JFLAP 7.1,
     # mientras que la tabla formal HTML muestra el AFD completo interno con su estado trampa qT.
-    jff_uri = build_jff_download_uri(
-        states, valid_transitions, tok_type=tok_type, is_afnd=is_afnd, include_trap=False
-    )
+    jff_uri = f"/static/jff_completos/{'AFND' if is_afnd else 'AFD'}_{tok_type}.jff"
     tipo_str = "AFND (Construcción de Thompson)" if is_afnd else "AFD Completo Interno (Subconjuntos con qT)"
     short_type = "AFND" if is_afnd else "AFD"
     filename = f"{short_type}_{tok_type}.jff"
-    btn_label = f"⬇ Descargar {filename} (JFLAP 7.1)" if is_afnd else f"⬇ Descargar {filename} (JFLAP 7.1 Ligero sin qT)"
+    btn_label = f"⬇ Descargar {filename} (JFLAP 7.1)" if is_afnd else f"⬇ Descargar {filename} (AFD COMPLETO con qT — usar JFLAP corregido)"
     conjunto_str = "Q'" if is_afnd else "Q"
     titulo_tabla = f"Tabla de Transición Formal {'δ\'' if is_afnd else 'δ'} — {tipo_str}"
 
@@ -477,7 +475,7 @@ def get_token_automata_spec(tok_type):
     legend = (
         f"ER Formal = {regex_expr} | "
         f"AFND Thompson: {len(states_afnd)} estados, {sum(1 for t in trans_afnd if t['label'] == 'ε')} transiciones ε | "
-        f"AFD Interno Completo: {len(states_afd) - 1} estados activos + qT (JFF Ligero exportado: {len(states_afd) - 1} estados sin qT)."
+        f"AFD Interno Completo: {len(states_afd) - 1} estados activos + qT (JFF completo descargable: {len(states_afd)} estados con qT)."
     )
     subset_info = " ; ".join(subset_mapping[:8]) + (" ..." if len(subset_mapping) > 8 else "")
 
