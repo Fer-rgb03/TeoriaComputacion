@@ -23,11 +23,25 @@
                 el.classList.remove('border-emerald-500', 'text-emerald-400', 'bg-slate-800/90');
                 el.classList.add('border-transparent', 'text-slate-400');
             });
-            document.getElementById(tabId).classList.remove('hidden');
+            const targetTab = document.getElementById(tabId);
+            if (targetTab) {
+                targetTab.classList.remove('hidden');
+            }
             const activeBtn = document.getElementById('btn-' + tabId);
             if (activeBtn) {
                 activeBtn.classList.add('border-emerald-500', 'text-emerald-400', 'bg-slate-800/90');
                 activeBtn.classList.remove('border-transparent', 'text-slate-400');
+            }
+        }
+
+        function jumpToSectionInTab(tabId, elementId) {
+            switchMainTab(tabId);
+            const targetEl = document.getElementById(elementId);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (elementId === 'log_input') {
+                    targetEl.focus();
+                }
             }
         }
 
@@ -86,236 +100,358 @@
             ⚠️ <strong>ADVERTENCIA DE LOTE PARCIAL (TRUNCAJE ACTIVO):</strong> Se recibieron <strong>{{ summary.total_received }}</strong> líneas, se procesaron las primeras <strong>{{ summary.total_lines }}</strong> y se descartaron <strong>{{ summary.discarded_lines }}</strong> líneas por superar el límite máximo de 200 líneas por lote.
         </div>
         {% endif %}
-<!-- A) CASO — requisitos académicos del curso -->
-        <section id="academico-caso" class="rounded-xl border border-sky-700 bg-slate-900 p-5 shadow-lg space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3">
+
+        <!-- BARRA DE NAVEGACIÓN DE LAS 4 PESTAÑAS ACADÉMICAS -->
+        <div class="border-b border-slate-800 flex flex-wrap gap-2">
+            <button id="btn-tab-presentacion" type="button" onclick="switchMainTab('tab-presentacion')"
+                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 {% if not has_analyzed %}border-emerald-500 text-emerald-400 bg-slate-800/90{% else %}border-transparent text-slate-400 hover:text-slate-200{% endif %} rounded-t-lg transition">
+                1. Presentación y Caso SOC
+            </button>
+            <button id="btn-tab-tokens" type="button" onclick="switchMainTab('tab-tokens')"
+                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 {% if has_analyzed %}border-emerald-500 text-emerald-400 bg-slate-800/90{% else %}border-transparent text-slate-400 hover:text-slate-200{% endif %} rounded-t-lg transition">
+                2. Análisis (Consola, Léxico y Diagnósticos)
+            </button>
+            <button id="btn-tab-catalogo-jflap" type="button" onclick="switchMainTab('tab-catalogo-jflap')"
+                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
+                3. Autómatas y JFLAP 7.1
+            </button>
+            <button id="btn-tab-arboles-gen" type="button" onclick="switchMainTab('tab-arboles-gen')"
+                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
+                4. Árboles (GLC/PDA) y Resultados
+            </button>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- PESTAÑA 1: PRESENTACIÓN, CASO SOC, ARQUITECTURA Y SEGURIDAD        -->
+        <!-- ================================================================== -->
+        <div id="tab-presentacion" class="main-tab-content {% if has_analyzed %}hidden{% endif %} space-y-6">
+
+            <!-- A) CASO — requisitos académicos del curso -->
+            <section id="academico-caso" class="rounded-xl border border-sky-700 bg-slate-900 p-5 shadow-lg space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-extrabold tracking-wider text-sky-300">A) CASO — PROCESO DE MONITOREO SOC</p>
+                        <h2 class="mt-1 text-lg font-bold text-white">Analizador léxico, sintáctico y semántico de registros de seguridad</h2>
+                    </div>
+                    <a href="#academico-proceso" onclick="jumpToSectionInTab('tab-tokens', 'academico-proceso'); return false;"
+                       class="rounded border border-emerald-700 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-950">Ver B) Proceso interno ↓</a>
+                </div>
+                <p class="text-sm text-slate-300">Caso académico de preparación de logs para su revisión por un analista del Centro de Operaciones de Seguridad (SOC). El sistema valida registros estructurados; no equivale a un SIEM completo ni demuestra detección de intrusiones reales.</p>
+                <div class="grid md:grid-cols-3 gap-3 text-xs">
+                    <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                        <h3 class="font-bold text-sky-300 mb-1">Entrada</h3>
+                        <p class="text-slate-300">Registro escrito en la consola o archivo <code>.txt</code> / <code>.log</code>; estructura: <code>TIMESTAMP IP SEVERITY EVENT_TYPE PAYLOAD</code>.</p>
+                    </div>
+                    <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                        <h3 class="font-bold text-amber-300 mb-1">Procesamiento</h3>
+                        <p class="text-slate-300">Léxico: 10 categorías con ER, AFND y AFD. Sintáctico: gramática y pila para payload JSON. Semántico: fechas, IPv4, eventos permitidos y reglas de entrada.</p>
+                    </div>
+                    <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                        <h3 class="font-bold text-emerald-300 mb-1">Salida</h3>
+                        <p class="text-slate-300">Diagnósticos por fase, tokens, árboles, simulación formal, tablas de transición, archivos JFLAP <code>.jff</code> y reportes de sesión.</p>
+                    </div>
+                </div>
+                <a href="#log_input" onclick="jumpToSectionInTab('tab-tokens', 'log_input'); return false;"
+                   class="inline-block text-xs text-sky-300 underline">Ir al ingreso de logs →</a>
+            </section>
+
+            <!-- RESUMEN EJECUTIVO Y VALOR DE NEGOCIO -->
+            <section class="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-lg relative overflow-hidden">
+                <div class="mb-5 border-b border-slate-600 pb-4 relative z-10">
+                    <span class="inline-block rounded-full bg-emerald-900/50 px-3 py-1 text-[11px] font-bold text-emerald-400 uppercase tracking-wide border border-emerald-700/50">
+                        Visión Ejecutiva y Ciberseguridad Defensiva
+                    </span>
+                    <h2 class="mt-2 text-xl font-bold text-white">
+                        SOC Analyzer: ¿Qué es, qué resuelve y qué facilita a las empresas?
+                    </h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-slate-300 leading-relaxed relative z-10">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 text-sky-400 font-bold text-base">
+                            <span>1. ¿Qué hace el sistema?</span>
+                        </div>
+                        <p>
+                            Actúa como un <strong>prototipo de validación formal
+                            de registros de seguridad</strong>.
+
+                            Utiliza Autómatas Finitos Deterministas (AFD),
+                            Autómatas No Deterministas (AFND de Thompson)
+                            y Autómatas de Pila para realizar análisis léxico,
+                            sintáctico y semántico de logs estructurados.
+                        </p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 text-rose-400 font-bold text-base">
+                            <span>2. ¿Qué problema resuelve?</span>
+                        </div>
+                        <p>
+                            Identifica <strong>errores léxicos, sintácticos
+                            y semánticos</strong> en registros de seguridad,
+                            como formatos incorrectos, fechas inexistentes
+                            y direcciones IPv4 fuera de rango.
+
+                            También señala determinados patrones sospechosos
+                            en las entradas, facilitando la revisión de
+                            registros por parte de un analista SOC.
+                        </p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 text-amber-400 font-bold text-base">
+                            <span>3. ¿Qué facilita a la empresa?</span>
+                        </div>
+                        <p>
+                            Facilita la <strong>validación y organización
+                            de registros de seguridad</strong> antes de su
+                            revisión o procesamiento posterior.
+
+                            Permite consultar diagnósticos detallados,
+                            visualizar el reconocimiento mediante autómatas
+                            y verificar la integridad de registros válidos
+                            mediante <strong>HMAC-SHA256</strong>.
+
+                            Su integración en entornos empresariales
+                            requiere pruebas adicionales.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- BLOQUE DECLARACIÓN FORMAL DEL SUBCONJUNTO DE LENGUAJE -->
+            <section class="rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-200 pb-4">
+                    <div>
+                        <span class="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 uppercase tracking-wide">
+                            Especificación Formal del Lenguaje &amp; Alcance del Prototipo Académico
+                        </span>
+                        <h2 class="mt-2 text-lg font-bold text-slate-900">
+                            Arquitectura de Validación en 4 Fases, Gramática JSON Simplificada y Seguridad de Sesión
+                        </h2>
+                    </div>
+
+                    {% if has_analyzed %}
+                    <div class="flex flex-wrap gap-2">
+                        <a href="/descargar/errores-json"
+                           class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 transition">
+                            <span>📥 Descargar Logs Rechazados de esta Sesión (.JSON)</span>
+                        </a>
+                        <a href="/descargar/reporte-txt"
+                           class="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow hover:bg-slate-900 transition">
+                            <span>📄 Descargar Reporte Área Revisión (.TXT)</span>
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="rounded-lg bg-slate-100 px-3 py-2 text-[11px] text-slate-600 border border-slate-300">
+                        🔒 Presione <strong>"Analizar Logs"</strong> en la pestaña Análisis para generar y habilitar la descarga aislada de reportes de su sesión.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-700 leading-relaxed">
+                    <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
+                        <h3 class="font-bold text-slate-900 mb-1">1. Equivalencia ER ↔ AFND ↔ AFD</h3>
+                        <p>
+                            Cada categoría léxica se compila desde su ER mediante Construcción de Thompson (AFND-ε) y Construcción por Subconjuntos (AFD completo sobre <code>Σ_ASCII</code> con estado trampa <code>qT</code>).
+                        </p>
+                    </div>
+
+                    <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
+                        <h3 class="font-bold text-slate-900 mb-1">2. Subconjunto "JSON Simplificado SOC"</h3>
+                        <p>
+                            La GLC modela objetos clave-valor con terminales <code>LBRACE</code>, <code>RBRACE</code>, <code>COLON</code>, <code>COMMA</code>, <code>STRING</code> y <code>NUMBER</code> restringido a enteros sin signo <code>0|[1-9][0-9]*</code> en <code>[0..10^9]</code>.
+                        </p>
+                    </div>
+
+                    <div class="rounded-lg bg-emerald-50/70 p-3.5 border border-emerald-300">
+                        <h3 class="font-bold text-emerald-950 mb-1">3. Aislamiento de Sesión y Clave HMAC</h3>
+                        <p class="text-emerald-900">
+                            Los reportes se aíslan por sesión y los registros válidos incluyen huella <strong>HMAC-SHA256 de 64 caracteres</strong> verificada contra almacenamiento en disco.
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- PESTAÑA 2: ANÁLISIS (CONSOLA, 2.1 ANÁLISIS LÉXICO Y DIAGNÓSTICOS)  -->
+        <!-- ================================================================== -->
+        <div id="tab-tokens" class="main-tab-content {% if not has_analyzed %}hidden{% endif %} space-y-6">
+
+            <!-- CONSOLA DE ENTRADA -->
+            <section class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <div>
+                        <h2 class="text-base font-semibold text-white">1. Consola de Entrada de Eventos SOC</h2>
+                        <p class="text-xs text-slate-400">
+                            Límites de entrada: <strong>Máx. 1 MB por archivo/solicitud</strong> • <strong>Máx. 200 líneas por lote</strong> • <strong>Máx. 2048 caracteres por línea</strong> • Codificación: <strong>UTF-8 estricto (Alfabeto Σ_ASCII 32..126)</strong>.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="loadSample('valido')" class="text-xs px-3 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 transition">Casos 1 y 2 (ERROR e INFO Válidos)</button>
+                        <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Caso 3 (2027-02-29 Semántico)</button>
+                        <button type="button" onclick="loadSample('lexico')" class="text-xs px-3 py-1.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700 transition">Error Léxico (@ y 007)</button>
+                        <button type="button" onclick="loadSample('sintactico')" class="text-xs px-3 py-1.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 transition">Error Sintáctico (Falta , o })</button>
+                        <button type="button" onclick="loadSample('seguridad')" class="text-xs px-3 py-1.5 rounded bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 transition">Alerta Patrón Sospechoso</button>
+                    </div>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                    <textarea id="log_input" name="log_input" rows="4"
+                        class="w-full bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-sm text-emerald-300 focus:outline-none focus:border-emerald-500"
+                        placeholder="Pega tus logs aquí...">{{ log_input }}</textarea>
+
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-slate-300 font-medium">Subir archivo <code class="text-emerald-400">.txt / .log</code>:</label>
+                            <input type="file" name="txt_file" accept=".txt,.log"
+                                class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700"/>
+                        </div>
+                        <button type="submit"
+                            class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg transition">
+                            Analizar Logs y Actualizar Simulación Dinámica
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- B) PROCESO INTERNO — 2.1 ANÁLISIS LÉXICO -->
+            <section id="academico-proceso" class="rounded-xl border border-emerald-700/70 bg-slate-900 p-5 shadow-lg space-y-5">
                 <div>
-                    <p class="text-xs font-extrabold tracking-wider text-sky-300">A) CASO — PROCESO DE MONITOREO SOC</p>
-                    <h2 class="mt-1 text-lg font-bold text-white">Analizador léxico, sintáctico y semántico de registros de seguridad</h2>
+                    <p class="text-xs font-bold tracking-wider text-emerald-300">B) PROCESO INTERNO</p>
+                    <h2 class="text-lg font-bold text-white mt-1">2.1 Análisis Léxico</h2>
+                    <p class="text-xs text-slate-400 mt-1">Los lexemas se obtienen del lote analizado. La expresión regular proviene de la gramática de producción y se presenta junto con su lenguaje y definición por conjuntos. Las reglas semánticas se evalúan después.</p>
+                    {% if is_demo %}
+                    <p class="mt-2 text-xs text-amber-300">Vista inicial: lexemas de demostración, no datos ingresados por el usuario.</p>
+                    {% endif %}
                 </div>
-                <a href="#academico-proceso" class="rounded border border-emerald-700 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-950">Ver B) Proceso interno ↓</a>
-            </div>
-            <p class="text-sm text-slate-300">Caso académico de preparación de logs para su revisión por un analista del Centro de Operaciones de Seguridad (SOC). El sistema valida registros estructurados; no equivale a un SIEM completo ni demuestra detección de intrusiones reales.</p>
-            <div class="grid md:grid-cols-3 gap-3 text-xs">
-                <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
-                    <h3 class="font-bold text-sky-300 mb-1">Entrada</h3>
-                    <p class="text-slate-300">Registro escrito en la consola o archivo <code>.txt</code> / <code>.log</code>; estructura: <code>TIMESTAMP IP SEVERITY EVENT_TYPE PAYLOAD</code>.</p>
+                <div class="overflow-x-auto rounded-lg border border-slate-700">
+                    <table id="tabla-academica-lexica" class="w-full min-w-[900px] border-collapse text-xs text-left">
+                        <thead>
+                            <tr class="bg-slate-800 text-white border-b border-slate-600">
+                                <th rowspan="2" class="p-3 border-r border-slate-700">Token (agrupador)</th>
+                                <th rowspan="2" class="p-3 border-r border-slate-700">Lexemas de los logs</th>
+                                <th rowspan="2" class="p-3 border-r border-slate-700">Notación Regex</th>
+                                <th colspan="2" class="p-3 text-center">Expresiones regulares — Notación por conjuntos</th>
+                            </tr>
+                            <tr class="bg-slate-800 text-slate-200">
+                                <th class="p-2 border-r border-slate-700">Lenguaje</th>
+                                <th class="p-2">Notación por conjuntos</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800">
+                            {% for row in academic_lexical_table %}
+                            <tr data-academic-token="{{ row.token }}" class="hover:bg-slate-800/60">
+                                <td class="align-top p-3 border-r border-slate-800">
+                                    <strong class="text-emerald-300 font-mono">{{ row.token }}</strong>
+                                    <p class="text-[10px] text-slate-400 mt-1">{{ row.agrupador }}</p>
+                                </td>
+                                <td class="align-top p-3 border-r border-slate-800">
+                                    {% if row.has_dynamic_lexemes %}
+                                        <div class="flex flex-wrap gap-1">
+                                            {% for lx in row.lexemes_list %}
+                                                <code class="px-1.5 py-1 rounded bg-slate-950 text-amber-200 break-all">{{ lx }}</code>
+                                            {% endfor %}
+                                        </div>
+                                        <p class="mt-1 text-[10px] text-slate-500">{{ row.occurrences_count }} ocurrencia(s)</p>
+                                    {% else %}
+                                        <span class="text-slate-500 italic">Sin ocurrencias en este lote</span>
+                                    {% endif %}
+                                </td>
+                                <td class="align-top p-3 border-r border-slate-800 font-mono text-sky-300 break-all"><code>{{ row.regex_notation }}</code></td>
+                                <td class="align-top p-3 border-r border-slate-800 text-slate-200">{{ row.language_notation }}</td>
+                                <td class="align-top p-3 font-mono text-violet-200 break-words">{{ row.set_notation }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
-                    <h3 class="font-bold text-amber-300 mb-1">Procesamiento</h3>
-                    <p class="text-slate-300">Léxico: 10 categorías con ER, AFND y AFD. Sintáctico: gramática y pila para payload JSON. Semántico: fechas, IPv4, eventos permitidos y reglas de entrada.</p>
-                </div>
-                <div class="p-3 rounded-lg bg-slate-950 border border-slate-800">
-                    <h3 class="font-bold text-emerald-300 mb-1">Salida</h3>
-                    <p class="text-slate-300">Diagnósticos por fase, tokens, árboles, simulación formal, tablas de transición, archivos JFLAP <code>.jff</code> y reportes de sesión.</p>
-                </div>
-            </div>
-            <a href="#log_input" class="text-xs text-sky-300 underline">Ir al ingreso de logs</a>
-        </section>
+            </section>
 
-        <!-- RESUMEN EJECUTIVO Y VALOR DE NEGOCIO -->
-        <section class="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-lg relative overflow-hidden">
-            <div class="mb-5 border-b border-slate-600 pb-4 relative z-10">
-                <span class="inline-block rounded-full bg-emerald-900/50 px-3 py-1 text-[11px] font-bold text-emerald-400 uppercase tracking-wide border border-emerald-700/50">
-                    Visión Ejecutiva y Ciberseguridad Defensiva
-                </span>
-                <h2 class="mt-2 text-xl font-bold text-white">
-                    SOC Analyzer: ¿Qué es, qué resuelve y qué facilita a las empresas?
-                </h2>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-slate-300 leading-relaxed relative z-10">
-                <div class="space-y-2">
-                    <div class="flex items-center gap-2 text-sky-400 font-bold text-base">
-                        <span>1. ¿Qué hace el sistema?</span>
+            <!-- DIAGNÓSTICOS Y RESULTADOS POR CADA LOG ANALIZADO -->
+            <div class="space-y-6">
+                {% for res in results %}
+                <details class="bg-slate-900 border {% if res.is_valid %}border-slate-800{% else %}border-rose-800/80{% endif %} rounded-xl overflow-hidden shadow-lg" {% if loop.first or not res.is_valid %}open{% endif %}>
+                    <summary class="px-6 py-4 cursor-pointer flex flex-wrap justify-between items-center gap-4 bg-slate-900 hover:bg-slate-800/60 transition">
+                        <div class="space-y-1">
+                            <span class="text-xs font-mono uppercase text-slate-400">Log Línea #{{ res.line_number }} ({{ res.tokens | length }} tokens inspeccionados)</span>
+                            <p class="font-mono text-sm text-slate-100 break-all">{{ res.raw }}</p>
+                        </div>
+                        {% if res.is_valid %}
+                            <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-700">✅ {{ res.status }}</span>
+                        {% else %}
+                            <span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-400 border border-rose-700">❌ {{ res.status }}</span>
+                        {% endif %}
+                    </summary>
+
+                    <div class="p-6 space-y-5 border-t border-slate-800">
+                        {% if res.integrity_hmac %}
+                        <div class="bg-emerald-950/40 border border-emerald-800/80 rounded-lg px-4 py-2.5 text-xs font-mono text-emerald-300 break-all">
+                            <strong>HMAC-SHA256 (64 hex verificados con compare_digest):</strong> {{ res.integrity_hmac }}
+                        </div>
+                        {% endif %}
+
+                        {% if res.errors %}
+                        <div class="bg-rose-950/70 border border-rose-700 rounded-lg p-4 text-xs text-rose-200 space-y-1">
+                            <p class="font-bold text-rose-400 uppercase">Diagnóstico Unificado de Rechazo (Línea y Columna):</p>
+                            {% for err in res.errors %}
+                                <p class="font-mono">• {{ err }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[900px] text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-800 text-slate-200 uppercase">
+                                        <th class="p-2.5 border border-slate-700">#</th>
+                                        <th class="p-2.5 border border-slate-700">Token</th>
+                                        <th class="p-2.5 border border-slate-700">Lexema</th>
+                                        <th class="p-2.5 border border-slate-700">Traza Real de Simulación (AFD / AFND)</th>
+                                        <th class="p-2.5 border border-slate-700">Estado Semántico</th>
+                                        <th class="p-2.5 border border-slate-700">Simulador Paso a Paso</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    {% for tok in res.tokens %}
+                                    {% set t_uid = 'L' ~ tok.line ~ '_T' ~ tok.index %}
+                                    <tr class="{% if tok.type == 'ERROR_LEXICO' %}bg-rose-950/60{% else %}hover:bg-slate-800/40{% endif %}">
+                                        <td class="p-2.5 border border-slate-800 font-mono text-slate-400">{{ tok.index }}</td>
+                                        <td class="p-2.5 border border-slate-800 font-bold font-mono {% if tok.type == 'ERROR_LEXICO' %}text-rose-400{% else %}text-emerald-400{% endif %}">{{ tok.type }}</td>
+                                        <td class="p-2.5 border border-slate-800 font-mono text-amber-300">{{ tok.value }}</td>
+                                        <td class="p-2.5 border border-slate-800 font-mono text-[11px] text-slate-300">{{ tok.live_trace }}</td>
+                                        <td class="p-2.5 border border-slate-800">
+                                            {% if tok.sem_ok and res.valid_lexical %}
+                                                <span class="text-emerald-400 font-semibold">✔ {{ tok.sem_msg }}</span>
+                                            {% elif not tok.sem_ok %}
+                                                <span class="text-rose-400 font-semibold">✖ {{ tok.sem_msg }}</span>
+                                            {% else %}
+                                                <span class="text-amber-300 font-semibold">⚠ {{ tok.sem_msg }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="p-2.5 border border-slate-800 text-center">
+                                            <button type="button" onclick="jumpToAutomaton('{{ tok.type }}', '{{ t_uid }}')"
+                                                class="px-2.5 py-1 rounded bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 font-semibold text-[11px] border border-amber-600/60 transition whitespace-nowrap">
+                                                ▶ Simular Token #{{ tok.index }}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <p>
-                        Actúa como un <strong>prototipo de validación formal
-                        de registros de seguridad</strong>.
-
-                        Utiliza Autómatas Finitos Deterministas (AFD),
-                        Autómatas No Deterministas (AFND de Thompson)
-                        y Autómatas de Pila para realizar análisis léxico,
-                        sintáctico y semántico de logs estructurados.
-                    </p>
-                </div>
-                <div class="space-y-2">
-                    <div class="flex items-center gap-2 text-rose-400 font-bold text-base">
-                        <span>2. ¿Qué problema resuelve?</span>
-                    </div>
-                    <p>
-                        Identifica <strong>errores léxicos, sintácticos
-                        y semánticos</strong> en registros de seguridad,
-                        como formatos incorrectos, fechas inexistentes
-                        y direcciones IPv4 fuera de rango.
-
-                        También señala determinados patrones sospechosos
-                        en las entradas, facilitando la revisión de
-                        registros por parte de un analista SOC.
-                    </p>
-                </div>
-                <div class="space-y-2">
-                    <div class="flex items-center gap-2 text-amber-400 font-bold text-base">
-                        <span>3. ¿Qué facilita a la empresa?</span>
-                    </div>
-                    <p>
-                        Facilita la <strong>validación y organización
-                        de registros de seguridad</strong> antes de su
-                        revisión o procesamiento posterior.
-
-                        Permite consultar diagnósticos detallados,
-                        visualizar el reconocimiento mediante autómatas
-                        y verificar la integridad de registros válidos
-                        mediante <strong>HMAC-SHA256</strong>.
-
-                        Su integración en entornos empresariales
-                        requiere pruebas adicionales.
-                    </p>
-                </div>
+                </details>
+                {% endfor %}
             </div>
-        </section>
+        </div>
 
-        <!-- BLOQUE DECLARACIÓN FORMAL DEL SUBCONJUNTO DE LENGUAJE -->
-        <section class="rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
-          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-200 pb-4">
-            <div>
-              <span class="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 uppercase tracking-wide">
-                Especificación Formal del Lenguaje &amp; Alcance del Prototipo Académico
-              </span>
-              <h2 class="mt-2 text-lg font-bold text-slate-900">
-                Arquitectura de Validación en 4 Fases, Gramática JSON Simplificada y Seguridad de Sesión
-              </h2>
-            </div>
+        <!-- ================================================================== -->
+        <!-- PESTAÑA 3: AUTÓMATAS Y JFLAP (2.2, 2.3, SIMULACIÓN Y CATÁLOGO)     -->
+        <!-- ================================================================== -->
+        <div id="tab-catalogo-jflap" class="main-tab-content hidden space-y-8">
 
-            {% if has_analyzed %}
-            <div class="flex flex-wrap gap-2">
-              <a href="/descargar/errores-json"
-                 class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 transition">
-                <span>📥 Descargar Logs Rechazados de esta Sesión (.JSON)</span>
-              </a>
-              <a href="/descargar/reporte-txt"
-                 class="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow hover:bg-slate-900 transition">
-                <span>📄 Descargar Reporte Área Revisión (.TXT)</span>
-              </a>
-            </div>
-            {% else %}
-            <div class="rounded-lg bg-slate-100 px-3 py-2 text-[11px] text-slate-600 border border-slate-300">
-              🔒 Presione <strong>"Analizar Logs"</strong> para generar y habilitar la descarga aislada de reportes de su sesión.
-            </div>
-            {% endif %}
-          </div>
-
-          <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-700 leading-relaxed">
-            <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
-              <h3 class="font-bold text-slate-900 mb-1">1. Equivalencia ER ↔ AFND ↔ AFD</h3>
-              <p>
-                Cada categoría léxica se compila desde su ER mediante Construcción de Thompson (AFND-ε) y Construcción por Subconjuntos (AFD completo sobre <code>Σ_ASCII</code> con estado trampa <code>qT</code>).
-              </p>
-            </div>
-
-            <div class="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
-              <h3 class="font-bold text-slate-900 mb-1">2. Subconjunto "JSON Simplificado SOC"</h3>
-              <p>
-                La GLC modela objetos clave-valor con terminales <code>LBRACE</code>, <code>RBRACE</code>, <code>COLON</code>, <code>COMMA</code>, <code>STRING</code> y <code>NUMBER</code> restringido a enteros sin signo <code>0|[1-9][0-9]*</code> en <code>[0..10^9]</code>.
-              </p>
-            </div>
-
-            <div class="rounded-lg bg-emerald-50/70 p-3.5 border border-emerald-300">
-              <h3 class="font-bold text-emerald-950 mb-1">3. Aislamiento de Sesión y Clave HMAC</h3>
-              <p class="text-emerald-900">
-                Los reportes se aíslan por sesión y los registros válidos incluyen huella <strong>HMAC-SHA256 de 64 caracteres</strong> verificada contra almacenamiento en disco.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <!-- CONSOLA DE ENTRADA -->
-        <section class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
-            <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                <div>
-                    <h2 class="text-base font-semibold text-white">1. Consola de Entrada de Eventos SOC</h2>
-                    <p class="text-xs text-slate-400">
-                        Límites de entrada: <strong>Máx. 1 MB por archivo/solicitud</strong> • <strong>Máx. 200 líneas por lote</strong> • <strong>Máx. 2048 caracteres por línea</strong> • Codificación: <strong>UTF-8 estricto (Alfabeto Σ_ASCII 32..126)</strong>.
-                    </p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" onclick="loadSample('valido')" class="text-xs px-3 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 transition">Casos 1 y 2 (ERROR e INFO Válidos)</button>
-                    <button type="button" onclick="loadSample('semantico')" class="text-xs px-3 py-1.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 transition">Caso 3 (2027-02-29 Semántico)</button>
-                    <button type="button" onclick="loadSample('lexico')" class="text-xs px-3 py-1.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700 transition">Error Léxico (@ y 007)</button>
-                    <button type="button" onclick="loadSample('sintactico')" class="text-xs px-3 py-1.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 transition">Error Sintáctico (Falta , o })</button>
-                    <button type="button" onclick="loadSample('seguridad')" class="text-xs px-3 py-1.5 rounded bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 transition">Alerta Patrón Sospechoso</button>
-                </div>
-            </div>
-
-            <form method="POST" enctype="multipart/form-data" class="space-y-4">
-                <textarea id="log_input" name="log_input" rows="4"
-                    class="w-full bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-sm text-emerald-300 focus:outline-none focus:border-emerald-500"
-                    placeholder="Pega tus logs aquí...">{{ log_input }}</textarea>
-
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <label class="text-xs text-slate-300 font-medium">Subir archivo <code class="text-emerald-400">.txt / .log</code>:</label>
-                        <input type="file" name="txt_file" accept=".txt,.log"
-                            class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700"/>
-                    </div>
-                    <button type="submit"
-                        class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg transition">
-                        Analizar Logs y Actualizar Simulación Dinámica
-                    </button>
-                </div>
-            </form>
-        </section>
-<!-- B) PROCESO INTERNO — Visión académica visible y basada en motor real -->
-        <section id="academico-proceso" class="rounded-xl border border-emerald-700/70 bg-slate-900 p-5 shadow-lg space-y-5">
-            <div>
-                <p class="text-xs font-bold tracking-wider text-emerald-300">B) PROCESO INTERNO</p>
-                <h2 class="text-lg font-bold text-white mt-1">2.1 Análisis Léxico</h2>
-                <p class="text-xs text-slate-400 mt-1">Los lexemas se obtienen del lote analizado. La expresión regular proviene de la gramática de producción y se presenta junto con su lenguaje y definición por conjuntos. Las reglas semánticas se evalúan después.</p>
-                {% if is_demo %}
-                <p class="mt-2 text-xs text-amber-300">Vista inicial: lexemas de demostración, no datos ingresados por el usuario.</p>
-                {% endif %}
-            </div>
-            <div class="overflow-x-auto rounded-lg border border-slate-700">
-                <table id="tabla-academica-lexica" class="w-full min-w-[900px] border-collapse text-xs text-left">
-                    <thead>
-                        <tr class="bg-slate-800 text-white border-b border-slate-600">
-                            <th rowspan="2" class="p-3 border-r border-slate-700">Token (agrupador)</th>
-                            <th rowspan="2" class="p-3 border-r border-slate-700">Lexemas de los logs</th>
-                            <th rowspan="2" class="p-3 border-r border-slate-700">Notación Regex</th>
-                            <th colspan="2" class="p-3 text-center">Expresiones regulares — Notación por conjuntos</th>
-                        </tr>
-                        <tr class="bg-slate-800 text-slate-200">
-                            <th class="p-2 border-r border-slate-700">Lenguaje</th>
-                            <th class="p-2">Notación por conjuntos</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800">
-                        {% for row in academic_lexical_table %}
-                        <tr data-academic-token="{{ row.token }}" class="hover:bg-slate-800/60">
-                            <td class="align-top p-3 border-r border-slate-800">
-                                <strong class="text-emerald-300 font-mono">{{ row.token }}</strong>
-                                <p class="text-[10px] text-slate-400 mt-1">{{ row.agrupador }}</p>
-                            </td>
-                            <td class="align-top p-3 border-r border-slate-800">
-                                {% if row.has_dynamic_lexemes %}
-                                    <div class="flex flex-wrap gap-1">
-                                        {% for lx in row.lexemes_list %}
-                                            <code class="px-1.5 py-1 rounded bg-slate-950 text-amber-200 break-all">{{ lx }}</code>
-                                        {% endfor %}
-                                    </div>
-                                    <p class="mt-1 text-[10px] text-slate-500">{{ row.occurrences_count }} ocurrencia(s)</p>
-                                {% else %}
-                                    <span class="text-slate-500 italic">Sin ocurrencias en este lote</span>
-                                {% endif %}
-                            </td>
-                            <td class="align-top p-3 border-r border-slate-800 font-mono text-sky-300 break-all"><code>{{ row.regex_notation }}</code></td>
-                            <td class="align-top p-3 border-r border-slate-800 text-slate-200">{{ row.language_notation }}</td>
-                            <td class="align-top p-3 font-mono text-violet-200 break-words">{{ row.set_notation }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="border-t border-slate-700 pt-4 space-y-3">
+            <!-- B) PROCESO INTERNO — 2.2 MÁQUINAS ABSTRACTAS Y 2.3 TABLAS DE TRANSICIONES -->
+            <section class="rounded-xl border border-emerald-700/70 bg-slate-900 p-5 shadow-lg space-y-4">
+                <p class="text-xs font-bold tracking-wider text-emerald-300">B) PROCESO INTERNO — MODELOS DE AUTÓMATAS FINITOS</p>
                 <h2 id="academico-maquinas" class="text-lg font-bold text-white">2.2 Máquinas Abstractas</h2>
                 <p class="text-xs text-slate-300">Construcción académica: <strong class="text-amber-300">ER → AFND (Thompson) → AFD (Subconjuntos)</strong>. Los modelos se generan del mismo motor formal que usa el simulador. Como ejemplo visible se presenta <code>NUMBER</code>; el catálogo incluye las 10 categorías.</p>
                 <p class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-mono text-sky-300"><strong>ER(NUMBER):</strong> {{ academic_lexical_table[5].formal_engine_regex }}</p>
@@ -334,173 +470,50 @@
                     </div>
                 </div>
                 {% endif %}
-                <h2 id="academico-transiciones" class="text-lg font-bold text-white">2.3 Tablas de Transiciones y Catálogo de Autómatas</h2>
+
+                <h2 id="academico-transiciones" class="text-lg font-bold text-white pt-2">2.3 Tablas de Transiciones y Catálogo de Autómatas</h2>
                 <p class="text-xs text-slate-300">
-    Las tablas δ' (AFND) y δ (AFD) están debajo de cada diagrama anterior,
-    generadas automáticamente por el motor formal.
-    Incluyen el estado inicial (→), los estados finales (*)
-    y botones para descargar archivos <code>.jff</code>
-    para su validación en JFLAP.
-    La compatibilidad con la versión estándar de JFLAP 7.1
-    todavía está pendiente de verificación.</p>
-                <!-- AVISO DE COMPATIBILIDAD JFLAP -->
-<div class="rounded-lg border border-sky-500/70 bg-sky-950/40
-            p-4 space-y-2 text-sm">
-
-    <h3 class="font-bold text-sky-300">
-        ℹ️ Aviso de compatibilidad con JFLAP 7.1
-    </h3>
-
-    <p class="text-slate-200">
-        Los automatas AFD y AFND han sido verificados
-        mediante pruebas formales y simulaciones
-        en un entorno JFLAP 7.1 corregido.
-    </p>
-
-    <p class="text-slate-300">
-        Actualmente, algunos archivos .jff pueden presentar
-        problemas de compatibilidad durante su simulacion
-        en la version estandar de JFLAP 7.1.
-    </p>
-
-    <p class="text-amber-300 font-semibold">
-        Estamos trabajando en mejorar la interoperabilidad
-        y desarrollar una solucion de exportacion y ejecucion
-        reproducible para JFLAP 7.1 estandar.
-    </p>
-
-    <p class="text-emerald-300 text-xs">
-        Las simulaciones integradas de SOC Analyzer
-        continuan disponibles y se verifican mediante
-        el motor formal del proyecto.
-    </p>
-
-</div>
-                <button type="button" onclick="switchMainTab('tab-catalogo-jflap'); document.getElementById('tab-catalogo-jflap').scrollIntoView({behavior:'smooth',block:'start'});"
-                        class="rounded bg-sky-700 hover:bg-sky-600 px-4 py-2 text-white text-xs font-bold">Abrir catálogo de los 10 autómatas y sus transiciones</button>
-            </div>
-        </section>
-        <!-- TARJETAS DE RESUMEN -->
-        <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p class="text-xs text-slate-400">Logs Analizados</p>
-                <p class="text-2xl font-bold text-white mt-1">{{ summary.total_lines }}</p>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p class="text-xs text-slate-400">Tokens en Logs Válidos / Totales</p>
-                <p class="text-2xl font-bold text-sky-400 mt-1">
-                    {{ summary.valid_logs_tokens }} <span class="text-sm font-normal text-slate-400">/ {{ summary.total_tokens }} insp.</span>
+                    Las tablas δ' (AFND) y δ (AFD) están debajo de cada diagrama anterior,
+                    generadas automáticamente por el motor formal.
+                    Incluyen el estado inicial (→), los estados finales (*)
+                    y botones para descargar archivos <code>.jff</code>
+                    para su validación en JFLAP.
+                    La compatibilidad con la versión estándar de JFLAP 7.1
+                    todavía está pendiente de verificación.
                 </p>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p class="text-xs text-slate-400">Logs Aceptados (Válidos)</p>
-                <p class="text-2xl font-bold text-emerald-400 mt-1">{{ summary.accepted }}</p>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p class="text-xs text-slate-400">Logs Rechazados (Con Error)</p>
-                <p class="text-2xl font-bold text-rose-400 mt-1">{{ summary.rejected }}</p>
-            </div>
-        </section>
 
-        <!-- BARRA DE PESTAÑAS -->
-        <div class="border-b border-slate-800 flex flex-wrap gap-2">
-            <button id="btn-tab-tokens" onclick="switchMainTab('tab-tokens')"
-                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-emerald-500 text-emerald-400 bg-slate-800/90 rounded-t-lg transition">
-                1. Resultados por Log, Tabla de Tokens y Trazas en Vivo
-            </button>
-            <button id="btn-tab-catalogo-jflap" onclick="switchMainTab('tab-catalogo-jflap')"
-                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
-                2. Simulación Dinámica del Lexema Actual &amp; Catálogo Maestro JFLAP 7.1
-            </button>
-            <button id="btn-tab-arboles-gen" onclick="switchMainTab('tab-arboles-gen')"
-                class="main-tab-btn px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 rounded-t-lg transition">
-                3. Árboles Sintácticos y Semánticos Generales (GLC y PDA)
-            </button>
-        </div>
-
-        <!-- ================================================================== -->
-        <!-- PESTAÑA 1: RESULTADOS POR LOG Y TRAZAS REALES SIN REDUNDANCIA      -->
-        <!-- ================================================================== -->
-        <div id="tab-tokens" class="main-tab-content space-y-6">
-            {% for res in results %}
-            <details class="bg-slate-900 border {% if res.is_valid %}border-slate-800{% else %}border-rose-800/80{% endif %} rounded-xl overflow-hidden shadow-lg" {% if loop.first or not res.is_valid %}open{% endif %}>
-                <summary class="px-6 py-4 cursor-pointer flex flex-wrap justify-between items-center gap-4 bg-slate-900 hover:bg-slate-800/60 transition">
-                    <div class="space-y-1">
-                        <span class="text-xs font-mono uppercase text-slate-400">Log Línea #{{ res.line_number }} ({{ res.tokens | length }} tokens inspeccionados)</span>
-                        <p class="font-mono text-sm text-slate-100 break-all">{{ res.raw }}</p>
-                    </div>
-                    {% if res.is_valid %}
-                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-700">✅ {{ res.status }}</span>
-                    {% else %}
-                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-400 border border-rose-700">❌ {{ res.status }}</span>
-                    {% endif %}
-                </summary>
-
-                <div class="p-6 space-y-5 border-t border-slate-800">
-                    {% if res.integrity_hmac %}
-                    <div class="bg-emerald-950/40 border border-emerald-800/80 rounded-lg px-4 py-2.5 text-xs font-mono text-emerald-300 break-all">
-                        <strong>HMAC-SHA256 (64 hex verificados con compare_digest):</strong> {{ res.integrity_hmac }}
-                    </div>
-                    {% endif %}
-
-                    {% if res.errors %}
-                    <div class="bg-rose-950/70 border border-rose-700 rounded-lg p-4 text-xs text-rose-200 space-y-1">
-                        <p class="font-bold text-rose-400 uppercase">Diagnóstico Unificado de Rechazo (Línea y Columna):</p>
-                        {% for err in res.errors %}
-                            <p class="font-mono">• {{ err }}</p>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[900px] text-left border-collapse text-xs">
-                            <thead>
-                                <tr class="bg-slate-800 text-slate-200 uppercase">
-                                    <th class="p-2.5 border border-slate-700">#</th>
-                                    <th class="p-2.5 border border-slate-700">Token</th>
-                                    <th class="p-2.5 border border-slate-700">Lexema</th>
-                                    <th class="p-2.5 border border-slate-700">Traza Real de Simulación (AFD / AFND)</th>
-                                    <th class="p-2.5 border border-slate-700">Estado Semántico</th>
-                                    <th class="p-2.5 border border-slate-700">Simulador Paso a Paso</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-800">
-                                {% for tok in res.tokens %}
-                                {% set t_uid = 'L' ~ tok.line ~ '_T' ~ tok.index %}
-                                <tr class="{% if tok.type == 'ERROR_LEXICO' %}bg-rose-950/60{% else %}hover:bg-slate-800/40{% endif %}">
-                                    <td class="p-2.5 border border-slate-800 font-mono text-slate-400">{{ tok.index }}</td>
-                                    <td class="p-2.5 border border-slate-800 font-bold font-mono {% if tok.type == 'ERROR_LEXICO' %}text-rose-400{% else %}text-emerald-400{% endif %}">{{ tok.type }}</td>
-                                    <td class="p-2.5 border border-slate-800 font-mono text-amber-300">{{ tok.value }}</td>
-                                    <td class="p-2.5 border border-slate-800 font-mono text-[11px] text-slate-300">{{ tok.live_trace }}</td>
-                                    <td class="p-2.5 border border-slate-800">
-                                        {% if tok.sem_ok and res.valid_lexical %}
-                                            <span class="text-emerald-400 font-semibold">✔ {{ tok.sem_msg }}</span>
-                                        {% elif not tok.sem_ok %}
-                                            <span class="text-rose-400 font-semibold">✖ {{ tok.sem_msg }}</span>
-                                        {% else %}
-                                            <span class="text-amber-300 font-semibold">⚠ {{ tok.sem_msg }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="p-2.5 border border-slate-800 text-center">
-                                        <button type="button" onclick="jumpToAutomaton('{{ tok.type }}', '{{ t_uid }}')"
-                                            class="px-2.5 py-1 rounded bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 font-semibold text-[11px] border border-amber-600/60 transition whitespace-nowrap">
-                                            ▶ Simular Token #{{ tok.index }}
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                <!-- AVISO DE COMPATIBILIDAD JFLAP -->
+                <div class="rounded-lg border border-sky-500/70 bg-sky-950/40 p-4 space-y-2 text-sm">
+                    <h3 class="font-bold text-sky-300">
+                        ℹ️ Aviso de compatibilidad con JFLAP 7.1
+                    </h3>
+                    <p class="text-slate-200">
+                        Los automatas AFD y AFND han sido verificados
+                        mediante pruebas formales y simulaciones
+                        en un entorno JFLAP 7.1 corregido.
+                    </p>
+                    <p class="text-slate-300">
+                        Actualmente, algunos archivos .jff pueden presentar
+                        problemas de compatibilidad durante su simulacion
+                        en la version estandar de JFLAP 7.1.
+                    </p>
+                    <p class="text-amber-300 font-semibold">
+                        Estamos trabajando en mejorar la interoperabilidad
+                        y desarrollar una solucion de exportacion y ejecucion
+                        reproducible para JFLAP 7.1 estandar.
+                    </p>
+                    <p class="text-emerald-300 text-xs">
+                        Las simulaciones integradas de SOC Analyzer
+                        continuan disponibles y se verifican mediante
+                        el motor formal del proyecto.
+                    </p>
                 </div>
-            </details>
-            {% endfor %}
-        </div>
 
-        <!-- ================================================================== -->
-        <!-- PESTAÑA 2: SIMULACIÓN DINÁMICA DEL LEXEMA ACTUAL & CATÁLOGO JFLAP  -->
-        <!-- ================================================================== -->
-        <div id="tab-catalogo-jflap" class="main-tab-content hidden space-y-8">
+                <button type="button" onclick="document.getElementById('cat-TIMESTAMP').scrollIntoView({behavior:'smooth',block:'start'});"
+                        class="rounded bg-sky-700 hover:bg-sky-600 px-4 py-2 text-white text-xs font-bold">
+                    Ir al catálogo completo de los 10 autómatas y sus transiciones ↓
+                </button>
+            </section>
 
             <!-- SECCIÓN REQUISITO 1: SIMULACIÓN DINÁMICA DEL LEXEMA ACTUAL -->
             <section id="sec-simulacion-dinamica-lexema" class="bg-slate-900 border-2 border-emerald-600/80 rounded-xl p-6 shadow-2xl space-y-6">
@@ -543,7 +556,6 @@
                     </div>
                 </div>
 
-                <!-- DIFERENCIACIÓN DE LOS 3 VEREDICTOS: LÉXICO, SEMÁNTICO Y GLOBAL DEL LOG (REQUISITO 9) -->
                 <!-- TARJETAS DE RESULTADOS: AFD, AFND, ANÁLISIS SINTÁCTICO, VALIDACIÓN SEMÁNTICA Y VEREDICTO GLOBAL -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                     <div id="card-verdict-afd" class="rounded-lg border border-slate-800 bg-slate-950 p-3">
@@ -576,6 +588,7 @@
                     </div>
                     <p id="sim-semantic-contrast-detail" class="text-amber-200"></p>
                 </div>
+
                 <!-- BANNER DE DIAGNÓSTICO EXACTO DE ERROR LÉXICO (ETAPA C - PRIORIDAD 3) -->
                 <div id="sim-error-diagnostic-banner" class="hidden rounded-lg border border-rose-500 bg-rose-950/80 p-3.5 text-xs font-mono text-rose-200 space-y-1">
                     <div class="font-bold text-rose-400 uppercase flex items-center gap-2">
@@ -779,41 +792,40 @@
                         <h4 class="text-xs font-bold text-emerald-400 uppercase mb-2">
                             Simulación del lexema actual en {{ tok_type }} (Extraído de los Logs Analizados: {{ cat_live_list | length }} ocurrencia(s))
                         </h4>
-                    {% if cat_live_list %}
-
-                    <div class="w-full max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-slate-800">
-                        <table class="w-full min-w-[900px] text-left border-collapse text-xs">
-                            <thead>
-                                <tr class="bg-slate-800 text-slate-200">
-                                    <th class="p-2 border border-slate-700">Lexema Real Analizado</th>
-                                    <th class="p-2 border border-slate-700">Resultado Léxico (AFD/AFND)</th>
-                                    <th class="p-2 border border-slate-700">Validación Semántica</th>
-                                    <th class="p-2 border border-slate-700">Traza Ejecutada en el Motor Formal</th>
-                                    <th class="p-2 border border-slate-700">Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in cat_live_list %}
-                                <tr>
-                                    <td class="p-2 border border-slate-800 font-mono text-amber-300 font-bold">{{ item.lexeme }}</td>
-                                    <td class="p-2 border border-slate-800 font-bold {% if item.lexical_accepted %}text-emerald-400{% else %}text-rose-400{% endif %}">
-                                        {{ item.afd.result }} (Final: {{ item.afd.final_states_reached | join(', ') }})
-                                    </td>
-                                    <td class="p-2 border border-slate-800 {% if item.semantic_accepted %}text-emerald-300{% else %}text-rose-300{% endif %}">
-                                        {% if item.semantic_accepted %}✔ {{ item.semantic_message }}{% else %}✖ {{ item.semantic_message }}{% endif %}
-                                    </td>
-                                    <td class="p-2 border border-slate-800 font-mono text-[11px] text-slate-300">
-                                        {{ item.afd.summary_text }} || {{ item.afnd.summary_text }}
-                                    </td>
-                                    <td class="p-2 border border-slate-800 text-center">
-                                        <button type="button" onclick="jumpToAutomaton('{{ tok_type }}', '{{ item.token_uid }}')"
-                                            class="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] transition">
-                                            ▶ Cargar en Simulador
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
+                        {% if cat_live_list %}
+                        <div class="w-full max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-slate-800">
+                            <table class="w-full min-w-[900px] text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-800 text-slate-200">
+                                        <th class="p-2 border border-slate-700">Lexema Real Analizado</th>
+                                        <th class="p-2 border border-slate-700">Resultado Léxico (AFD/AFND)</th>
+                                        <th class="p-2 border border-slate-700">Validación Semántica</th>
+                                        <th class="p-2 border border-slate-700">Traza Ejecutada en el Motor Formal</th>
+                                        <th class="p-2 border border-slate-700">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in cat_live_list %}
+                                    <tr>
+                                        <td class="p-2 border border-slate-800 font-mono text-amber-300 font-bold">{{ item.lexeme }}</td>
+                                        <td class="p-2 border border-slate-800 font-bold {% if item.lexical_accepted %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                                            {{ item.afd.result }} (Final: {{ item.afd.final_states_reached | join(', ') }})
+                                        </td>
+                                        <td class="p-2 border border-slate-800 {% if item.semantic_accepted %}text-emerald-300{% else %}text-rose-300{% endif %}">
+                                            {% if item.semantic_accepted %}✔ {{ item.semantic_message }}{% else %}✖ {{ item.semantic_message }}{% endif %}
+                                        </td>
+                                        <td class="p-2 border border-slate-800 font-mono text-[11px] text-slate-300">
+                                            {{ item.afd.summary_text }} || {{ item.afnd.summary_text }}
+                                        </td>
+                                        <td class="p-2 border border-slate-800 text-center">
+                                            <button type="button" onclick="jumpToAutomaton('{{ tok_type }}', '{{ item.token_uid }}')"
+                                                class="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] transition">
+                                                ▶ Cargar en Simulador
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
                             </table>
                         </div>
                         {% else %}
@@ -829,28 +841,28 @@
                         <h4 class="text-xs font-bold text-amber-300 uppercase mb-2">
                             Casos de demostración — Banco de Referencia JFLAP ({{ tok_type }})
                         </h4>
-                    <div class="w-full max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-slate-800">
-                        <p class="md:hidden text-xs text-sky-300 mb-2">
-                            ← Desliza la tabla horizontalmente para visualizar todas las columnas →
-                        </p>
-                        <table class="w-full min-w-[750px] text-left border-collapse text-xs">
-                            <thead>
-                                <tr class="bg-slate-800 text-slate-300">
-                                    <th class="p-2 border border-slate-700">Input de Demostración</th>
-                                    <th class="p-2 border border-slate-700">Result (JFLAP 7.1)</th>
-                                    <th class="p-2 border border-slate-700">Traza de Referencia (AFD y AFND)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for inp, res_run, mot in cat.jflap_runs %}
-                                <tr>
-                                    <td class="p-2 border border-slate-800 font-mono text-white">{{ inp }}</td>
-                                    <td class="p-2 border border-slate-800 font-bold {% if res_run == 'Accept' %}text-emerald-400 bg-emerald-950/40{% else %}text-rose-400 bg-rose-950/40{% endif %}">{{ res_run }}</td>
-                                    <td class="p-2 border border-slate-800 font-mono text-[11px] text-slate-300">{{ mot }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                        <div class="w-full max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-slate-800">
+                            <p class="md:hidden text-xs text-sky-300 mb-2">
+                                ← Desliza la tabla horizontalmente para visualizar todas las columnas →
+                            </p>
+                            <table class="w-full min-w-[750px] text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-800 text-slate-300">
+                                        <th class="p-2 border border-slate-700">Input de Demostración</th>
+                                        <th class="p-2 border border-slate-700">Result (JFLAP 7.1)</th>
+                                        <th class="p-2 border border-slate-700">Traza de Referencia (AFD y AFND)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for inp, res_run, mot in cat.jflap_runs %}
+                                    <tr>
+                                        <td class="p-2 border border-slate-800 font-mono text-white">{{ inp }}</td>
+                                        <td class="p-2 border border-slate-800 font-bold {% if res_run == 'Accept' %}text-emerald-400 bg-emerald-950/40{% else %}text-rose-400 bg-rose-950/40{% endif %}">{{ res_run }}</td>
+                                        <td class="p-2 border border-slate-800 font-mono text-[11px] text-slate-300">{{ mot }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -859,9 +871,55 @@
         </div>
 
         <!-- ================================================================== -->
-        <!-- PESTAÑA 3: ÁRBOLES SINTÁCTICOS Y SEMÁNTICOS GENERALES              -->
+        <!-- PESTAÑA 4: ÁRBOLES (GLC/PDA), ESTADÍSTICAS Y REPORTES DE SESIÓN    -->
         <!-- ================================================================== -->
         <div id="tab-arboles-gen" class="main-tab-content hidden space-y-8">
+
+            <!-- TARJETAS DE ESTADÍSTICAS Y REPORTES DE LA SESIÓN -->
+            <section class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5 shadow-lg">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Resumen Estadístico y Reportes de Sesión</span>
+                        <h2 class="text-lg font-bold text-white mt-0.5">Métricas del Lote Analizado, Autómata de Pila (PDA) y Árboles de Derivación</h2>
+                    </div>
+                    {% if has_analyzed %}
+                    <div class="flex flex-wrap gap-2">
+                        <a href="/descargar/errores-json"
+                           class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 transition">
+                            <span>📥 Descargar Logs Rechazados (.JSON)</span>
+                        </a>
+                        <a href="/descargar/reporte-txt"
+                           class="inline-flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-slate-700 transition">
+                            <span>📄 Descargar Reporte Área Revisión (.TXT)</span>
+                        </a>
+                    </div>
+                    {% else %}
+                    <span class="text-xs text-slate-400 font-mono">Analice un lote propio en la Pestaña 2 para habilitar las descargas de sesión.</span>
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                        <p class="text-xs text-slate-400">Logs Analizados</p>
+                        <p class="text-2xl font-bold text-white mt-1">{{ summary.total_lines }}</p>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                        <p class="text-xs text-slate-400">Tokens en Logs Válidos / Totales</p>
+                        <p class="text-2xl font-bold text-sky-400 mt-1">
+                            {{ summary.valid_logs_tokens }} <span class="text-sm font-normal text-slate-400">/ {{ summary.total_tokens }} insp.</span>
+                        </p>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                        <p class="text-xs text-slate-400">Logs Aceptados (Válidos)</p>
+                        <p class="text-2xl font-bold text-emerald-400 mt-1">{{ summary.accepted }}</p>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                        <p class="text-xs text-slate-400">Logs Rechazados (Con Error)</p>
+                        <p class="text-2xl font-bold text-rose-400 mt-1">{{ summary.rejected }}</p>
+                    </div>
+                </div>
+            </section>
+
             {% for res in results %}
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-3">
